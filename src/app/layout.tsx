@@ -1,8 +1,38 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import localFont from 'next/font/local'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'] })
+const nippo = localFont({
+  src: [
+    {
+      path: '../../public/fonts/Nippo-Extralight.otf',
+      weight: '200',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/Nippo-Light.otf',
+      weight: '300',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/Nippo-Regular.otf',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/Nippo-Medium.otf',
+      weight: '500',
+      style: 'normal',
+    },
+    {
+      path: '../../public/fonts/Nippo-Bold.otf',
+      weight: '700',
+      style: 'normal',
+    },
+  ],
+  variable: '--font-nippo',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'Fumble - Clean Your Crypto Wallet',
@@ -29,7 +59,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${nippo.variable} font-nippo`}>
         <div className="min-h-screen bg-primary">
           {children}
         </div>
