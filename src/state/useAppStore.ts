@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { AppState, Token, WalletAddress, SwipeAction } from '@/types'
+import { AppState, Token, WalletAddress, SwipeAction, SessionData, OrderIntent } from '@/types'
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -85,16 +85,52 @@ export const useAppStore = create<AppState>()(
       setIsScanning: (scanning: boolean) => {
         set({ isScanning: scanning })
       },
+
+      // Sessions
+      sessions: {},
+      setSessions: (sessions: Record<number, SessionData>) => {
+        set({ sessions })
+      },
+      updateSession: (chainId: number, data: Partial<SessionData>) => {
+        set((state) => ({
+          sessions: {
+            ...state.sessions,
+            [chainId]: {
+              ...state.sessions[chainId],
+              ...data,
+            },
+          },
+        }))
+      },
+
+      // Orders
+      orders: [],
+      addOrder: (order: OrderIntent) => {
+        set((state) => ({
+          orders: [...state.orders, order],
+        }))
+      },
+      updateOrder: (orderId: string, updates: Partial<OrderIntent>) => {
+        set((state) => ({
+          orders: state.orders.map((order) =>
+            order.id === orderId ? { ...order, ...updates } : order
+          ),
+        }))
+      },
     }),
     {
       name: 'fumble-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        addresses: state.addresses,
-        trashThreshold: state.trashThreshold,
-        swipeActions: state.swipeActions,
-        dumpTokens: state.dumpTokens,
-        keepTokens: state.keepTokens,
+        // Only persist essential data for mobile PWA
+        addresses: state.addresses,        // User's wallet addresses
+        trashThreshold: state.trashThreshold, // User preference
+        sessions: state.sessions,          // Required for gasless transactions
+        // Transient data kept in memory only:
+        // - swipeActions: cleared on app restart
+        // - dumpTokens: cleared on app restart
+        // - keepTokens: cleared on app restart
+        // - orders: cleared on app restart
       }),
     }
   )

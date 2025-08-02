@@ -32,9 +32,29 @@ export interface ChainConfig {
   symbol: string
   rpcUrl: string
   blockExplorer: string
-  usdtAddress: string
+  usdcAddress: string
   oneInchProtocolAddress: string
   enabled: boolean
+}
+
+export interface SessionData {
+  chainId: number
+  accountAddress: `0x${string}`
+  isEnabled: boolean
+  expiresAt: number
+}
+
+export interface OrderIntent {
+  id: string
+  chainId: number
+  tokenAddress: string
+  tokenSymbol: string
+  tokenAmount: string
+  estimatedUSDC: string
+  status: 'pending' | 'signing' | 'submitted' | 'executed' | 'failed' | 'expired'
+  orderHash?: string
+  error?: string
+  timestamp: number
 }
 
 export interface AppState {
@@ -63,4 +83,12 @@ export interface AppState {
   // Sessions & connections
   isScanning: boolean
   setIsScanning: (scanning: boolean) => void
+  sessions: Record<number, SessionData>
+  setSessions: (sessions: Record<number, SessionData>) => void
+  updateSession: (chainId: number, data: Partial<SessionData>) => void
+  
+  // Orders
+  orders: OrderIntent[]
+  addOrder: (order: OrderIntent) => void
+  updateOrder: (orderId: string, updates: Partial<OrderIntent>) => void
 }

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { WalletIcon, RotateCcw } from 'lucide-react';
 import { SwipableCard } from '@/components/SwipableCard';
 import { useAppStore } from '@/state/useAppStore';
-import { generateMockTokens } from '@/utils/mock';
+import Image from 'next/image';
 
 export default function SwipePage() {
   const router = useRouter();
@@ -23,13 +23,7 @@ export default function SwipePage() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  useEffect(() => {
-    // Load mock tokens if none exist
-    if (tokens.length === 0) {
-      const mockTokens = generateMockTokens(trashThreshold);
-      setTokens(mockTokens);
-    }
-  }, [tokens.length, setTokens, trashThreshold]);
+  // Remove mock token generation - only use real scanned tokens
 
   const handleSwipe = (direction: 'left' | 'right') => {
     const currentToken = tokens[currentIndex];
@@ -55,10 +49,43 @@ export default function SwipePage() {
 
   if (tokens.length === 0) {
     return (
-      <div className='min-h-screen bg-primary flex items-center justify-center'>
-        <div className='text-center'>
-          <div className='w-16 h-16 border-4 border-gray-900/20 border-t-gray-900 rounded-full animate-spin mx-auto mb-4' />
-          <p className='text-primary-foreground'>Loading tokens...</p>
+      <div className='min-h-screen bg-primary flex flex-col safe-area-inset-top safe-area-inset-bottom'>
+        {/* Header */}
+        <div className='flex items-center justify-between p-4'>
+          <button 
+            onClick={() => router.back()}
+            className='p-2 -ml-2 rounded-full hover:bg-black/10 transition-colors'
+          >
+            <RotateCcw className='w-6 h-6' />
+          </button>
+          <Image src='/bell.png' alt='Bell' width={32} height={32} className='w-8 h-8' />
+          <button className='p-2 -mr-2 rounded-full hover:bg-black/10 transition-colors'>
+            <WalletIcon className='w-6 h-6' />
+          </button>
+        </div>
+
+        {/* Empty state message */}
+        <div className='flex-1 flex items-center justify-center px-6'>
+          <div className='bg-white rounded-3xl p-8 shadow-2xl border border-gray-100 aspect-[5/6] w-full max-w-sm flex items-center justify-center'>
+            <div className='text-center'>
+              <div className='text-6xl mb-6'>🏛️</div>
+              <h2 className='text-xl font-bold text-gray-900 mb-4'>
+                No tokens to dump
+              </h2>
+              <p className='text-gray-600 text-center leading-relaxed'>
+                Your wallet is a museum of good decisions.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer placeholder */}
+        <div className='px-6 py-8 bg-primary-light'>
+          <div className='text-center'>
+            <p className='text-primary-foreground/60 text-sm'>
+              Scan more wallets to find tokens worth dumping
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -73,7 +100,7 @@ export default function SwipePage() {
         <button className='p-2 -ml-2 rounded-full hover:bg-black/10 transition-colors'>
           <RotateCcw className='w-6 h-6' />
         </button>
-        <img src='/bell.png' alt='Bell' className='w-8 h-8' />
+        <Image src='/bell.png' alt='Bell' width={32} height={32} className='w-8 h-8' />
         <button className='p-2 -mr-2 rounded-full hover:bg-black/10 transition-colors'>
           <WalletIcon className='w-6 h-6' />
         </button>
