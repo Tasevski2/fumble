@@ -10,12 +10,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@biconomy/account": "^4.5.7",
-    "@biconomy/bundler": "^3.1.4",
-    "@biconomy/common": "^3.1.4",
-    "@biconomy/core-types": "^3.1.4",
-    "@biconomy/modules": "^3.1.4",
-    "@biconomy/paymaster": "^3.1.4",
     "@metamask/sdk": "^0.20.3",
     "@metamask/sdk-react": "^0.20.3",
     "@radix-ui/react-dialog": "^1.0.5",
