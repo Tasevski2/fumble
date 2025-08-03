@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import './globals.css'
+import { Providers } from '@/components/providers/WagmiProvider'
 
 const nippo = localFont({
   src: [
@@ -60,9 +61,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${nippo.variable} font-nippo`}>
-        <div className="min-h-screen bg-primary">
-          {children}
-        </div>
+        <Providers>
+          <div className="min-h-screen bg-primary">
+            {children}
+          </div>
+        </Providers>
       </body>
     </html>
   )
