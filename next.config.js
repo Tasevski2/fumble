@@ -6,7 +6,14 @@ const nextConfig = {
     domains: ['tokens.1inch.io', 'raw.githubusercontent.com'],
   },
   webpack: (config) => {
-    config.resolve.fallback = { fs: false, net: false, tls: false };
+    config.resolve.fallback = { 
+      fs: false, 
+      net: false, 
+      tls: false,
+      encoding: false,
+      stream: false,
+      crypto: false,
+    };
     return config;
   },
 }
