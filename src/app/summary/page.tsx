@@ -3,7 +3,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ExternalLink, WalletIcon, CheckCircle, XCircle } from 'lucide-react';
+import {
+  ExternalLink,
+  WalletIcon,
+  CheckCircle,
+  XCircle,
+  RotateCcw,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/state/useAppStore';
 import { formatPrice } from '@/utils/mock';
@@ -16,12 +22,22 @@ import Image from 'next/image';
 
 export default function SummaryPage() {
   const router = useRouter();
-  const { dumpTokens, addresses, sessions, orders } = useAppStore();
-  const { connect, initializeSession, hasSession, isConnecting, error, getSession } = useWallet();
+  const { dumpTokens, addresses, sessions, orders, resetAppState } =
+    useAppStore();
+  const {
+    connect,
+    initializeSession,
+    hasSession,
+    isConnecting,
+    error,
+    getSession,
+  } = useWallet();
   const { executePurge } = useOrderExecutor();
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [showSessionModal, setShowSessionModal] = useState(false);
-  const [initializingSessions, setInitializingSessions] = useState<Record<number, boolean>>({});
+  const [initializingSessions, setInitializingSessions] = useState<
+    Record<number, boolean>
+  >({});
   const [footerHeight, setFooterHeight] = useState(0);
   const footerRef = useRef<HTMLDivElement>(null);
 
@@ -37,7 +53,9 @@ export default function SummaryPage() {
   }, []);
 
   // Get unique chains from dump tokens
-  const chainsToEnable = Array.from(new Set(dumpTokens.map(token => token.chainId)));
+  const chainsToEnable = Array.from(
+    new Set(dumpTokens.map((token) => token.chainId))
+  );
 
   const handleConnect = async (addressId: string) => {
     try {
@@ -48,28 +66,30 @@ export default function SummaryPage() {
   };
 
   const handleEnableSession = async (chainId: number) => {
-    setInitializingSessions(prev => ({ ...prev, [chainId]: true }));
+    setInitializingSessions((prev) => ({ ...prev, [chainId]: true }));
     try {
       await initializeSession(chainId);
     } catch (err) {
       console.error('Session initialization failed:', err);
     } finally {
-      setInitializingSessions(prev => ({ ...prev, [chainId]: false }));
+      setInitializingSessions((prev) => ({ ...prev, [chainId]: false }));
     }
   };
 
   const handlePurgeClick = () => {
     // Check if any address is connected
-    const hasConnectedAddress = addresses.some(addr => addr.isConnected);
-    
+    const hasConnectedAddress = addresses.some((addr) => addr.isConnected);
+
     if (!hasConnectedAddress) {
       setShowWalletModal(true);
       return;
     }
 
     // Check if sessions are enabled for all required chains
-    const missingChains = chainsToEnable.filter(chainId => !hasSession(chainId));
-    
+    const missingChains = chainsToEnable.filter(
+      (chainId) => !hasSession(chainId)
+    );
+
     if (missingChains.length > 0) {
       setShowSessionModal(true);
       return;
@@ -89,7 +109,7 @@ export default function SummaryPage() {
       // Get required session handles for retry
       const requiredChains = [chainId];
       const sessionHandles: Record<number, any> = {};
-      
+
       for (const cId of requiredChains) {
         const session = getSession(cId);
         if (!session) {
@@ -97,23 +117,27 @@ export default function SummaryPage() {
         }
         sessionHandles[cId] = session;
       }
-      
+
       // Find the failed token
-      const failedToken = dumpTokens.find(token => 
-        token.symbol === tokenSymbol && token.chainId === chainId
+      const failedToken = dumpTokens.find(
+        (token) => token.symbol === tokenSymbol && token.chainId === chainId
       );
-      
+
       if (!failedToken) {
         console.error('Failed token not found for retry');
         return;
       }
-      
+
       // Execute retry for single token
       await executePurge(sessionHandles);
-      
     } catch (error) {
       console.error('Retry failed:', error);
     }
+  };
+
+  const handleStartOver = () => {
+    resetAppState();
+    router.push('/enter');
   };
 
   return (
@@ -124,9 +148,15 @@ export default function SummaryPage() {
           onClick={() => router.back()}
           className='p-2 -ml-2 rounded-full hover:bg-black/10 transition-colors'
         >
-          <ArrowLeft className='w-6 h-6' />
+          <RotateCcw className='w-6 h-6' />
         </button>
-        <Image src='/bell-yellow.png' alt='Bell' width={32} height={32} className='w-8 h-8' />
+        <Image
+          src='/bell-yellow.png'
+          alt='Bell'
+          width={32}
+          height={32}
+          className='w-8 h-8'
+        />
         <button className='p-2 -mr-2 rounded-full hover:bg-black/10 transition-colors'>
           <WalletIcon className='w-6 h-6' />
         </button>
@@ -158,7 +188,7 @@ export default function SummaryPage() {
               <div className='space-y-3'>
                 {dumpTokens.map((token, index) => {
                   const orderStatus = getTokenOrderStatus(token, orders);
-                  
+
                   return (
                     <motion.div
                       key={token.id}
@@ -169,9 +199,23 @@ export default function SummaryPage() {
                     >
                       <div className='flex items-center gap-3'>
                         <div className='w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center'>
-                          <span className='text-xs font-bold text-gray-600'>
-                            {token.symbol.slice(0, 2)}
-                          </span>
+                          {token.logoUrl ? (
+                            <Image
+                              src={token.logoUrl}
+                              alt={token.symbol}
+                              width={32}
+                              height={32}
+                              className='w-8 h-8 rounded-full'
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display =
+                                  'none';
+                              }}
+                            />
+                          ) : (
+                            <span className='text-xs font-bold text-gray-600'>
+                              {token.symbol.slice(0, 2)}
+                            </span>
+                          )}
                         </div>
                         <div className='flex-1'>
                           <div className='flex items-center gap-2 mb-1'>
@@ -179,14 +223,16 @@ export default function SummaryPage() {
                               {token.symbol}
                             </p>
                             {orderStatus.status !== 'none' && (
-                              <OrderStatusBadge 
+                              <OrderStatusBadge
                                 status={orderStatus.status}
                                 className='text-xs'
                               />
                             )}
                           </div>
                           <p className='text-sm text-gray-500'>
-                            {orderStatus.status === 'executed' ? 'to USDC ✓' : 'to USDC'}
+                            {orderStatus.status === 'executed'
+                              ? 'to USDC ✓'
+                              : 'to USDC'}
                           </p>
                         </div>
                       </div>
@@ -194,14 +240,21 @@ export default function SummaryPage() {
                         <p className='font-bold text-gray-900'>
                           ${token.balanceUsd.toFixed(2)}
                         </p>
-                        {orderStatus.order?.estimatedUSDC && orderStatus.status === 'executed' && (
-                          <p className='text-xs text-green-600 mt-1'>
-                            +${parseFloat(orderStatus.order.estimatedUSDC).toFixed(2)} USDC
-                          </p>
-                        )}
+                        {orderStatus.order?.estimatedUSDC &&
+                          orderStatus.status === 'executed' && (
+                            <p className='text-xs text-green-600 mt-1'>
+                              +$
+                              {parseFloat(
+                                orderStatus.order.estimatedUSDC
+                              ).toFixed(2)}{' '}
+                              USDC
+                            </p>
+                          )}
                         {orderStatus.status === 'failed' && (
                           <button
-                            onClick={() => handleRetryOrder(token.symbol, token.chainId)}
+                            onClick={() =>
+                              handleRetryOrder(token.symbol, token.chainId)
+                            }
                             className='text-xs text-blue-600 hover:text-blue-800 mt-1 underline'
                           >
                             Retry
@@ -299,11 +352,14 @@ export default function SummaryPage() {
 
             {/* Modal - slides from behind footer */}
             <motion.div
-              className='fixed left-0 right-0 bg-primary z-30 rounded-t-3xl overflow-hidden'
+              className='fixed left-0 right-0 bg-primary z-50 rounded-t-3xl overflow-hidden'
               style={{ bottom: 0 }}
               initial={{ y: '100%' }}
               animate={{ y: `-${footerHeight}px` }}
-              exit={{ y: '100%', transition: { duration: 0.3, ease: 'easeIn' } }}
+              exit={{
+                y: '100%',
+                transition: { duration: 0.3, ease: 'easeIn' },
+              }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             >
               <div className='p-6'>
@@ -345,7 +401,11 @@ export default function SummaryPage() {
                             : 'bg-white text-primary-foreground hover:bg-white/90'
                         }
                       >
-                        {isConnecting ? 'Connecting...' : addr.isConnected ? 'Connected' : 'Connect'}
+                        {isConnecting
+                          ? 'Connecting...'
+                          : addr.isConnected
+                          ? 'Connected'
+                          : 'Connect'}
                       </Button>
                     </motion.div>
                   ))}
@@ -376,7 +436,10 @@ export default function SummaryPage() {
               style={{ bottom: 0 }}
               initial={{ y: '100%' }}
               animate={{ y: `-${footerHeight}px` }}
-              exit={{ y: '100%', transition: { duration: 0.3, ease: 'easeIn' } }}
+              exit={{
+                y: '100%',
+                transition: { duration: 0.3, ease: 'easeIn' },
+              }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             >
               <div className='p-6'>
@@ -413,11 +476,13 @@ export default function SummaryPage() {
                               {chainConfig?.name || `Chain ${chainId}`}
                             </p>
                             <p className='text-xs text-primary-foreground/60'>
-                              {isEnabled ? 'Gasless enabled' : 'Enable gasless trading'}
+                              {isEnabled
+                                ? 'Gasless enabled'
+                                : 'Enable gasless trading'}
                             </p>
                           </div>
                         </div>
-                        
+
                         <Button
                           onClick={() => handleEnableSession(chainId)}
                           disabled={isEnabled || isInitializing}
@@ -428,12 +493,11 @@ export default function SummaryPage() {
                               : 'bg-white text-primary-foreground hover:bg-white/90'
                           }
                         >
-                          {isInitializing 
-                            ? 'Enabling...' 
-                            : isEnabled 
-                              ? 'Enabled' 
-                              : 'Enable'
-                          }
+                          {isInitializing
+                            ? 'Enabling...'
+                            : isEnabled
+                            ? 'Enabled'
+                            : 'Enable'}
                         </Button>
                       </motion.div>
                     );
@@ -449,7 +513,9 @@ export default function SummaryPage() {
                 <div className='mt-6'>
                   <Button
                     onClick={() => router.push('/success')}
-                    disabled={chainsToEnable.some(chainId => !hasSession(chainId))}
+                    disabled={chainsToEnable.some(
+                      (chainId) => !hasSession(chainId)
+                    )}
                     className='w-full bg-white text-primary-foreground hover:bg-white/90 h-12 rounded-xl font-medium'
                   >
                     Continue to Purge

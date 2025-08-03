@@ -11,7 +11,8 @@ import Image from 'next/image';
 export default function SwipePage() {
   const router = useRouter();
   const {
-    tokens,
+    // tokens,
+    getTrashTokens,
     setTokens,
     currentTokenIndex,
     nextToken,
@@ -19,8 +20,9 @@ export default function SwipePage() {
     dumpTokens,
     keepTokens,
     trashThreshold,
+    resetAppState,
   } = useAppStore();
-
+  const tokens = getTrashTokens();
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Remove mock token generation - only use real scanned tokens
@@ -41,8 +43,10 @@ export default function SwipePage() {
     }
   };
 
-  const handleDump = () => handleSwipe('left');
-  const handleKeep = () => handleSwipe('right');
+  const handleStartOver = () => {
+    resetAppState();
+    router.push('/enter');
+  };
 
   const totalJudged = dumpTokens.length + keepTokens.length;
   const pendingCount = tokens.length - totalJudged;
@@ -52,13 +56,19 @@ export default function SwipePage() {
       <div className='min-h-screen bg-primary flex flex-col safe-area-inset-top safe-area-inset-bottom'>
         {/* Header */}
         <div className='flex items-center justify-between p-4'>
-          <button 
+          <button
             onClick={() => router.back()}
             className='p-2 -ml-2 rounded-full hover:bg-black/10 transition-colors'
           >
             <RotateCcw className='w-6 h-6' />
           </button>
-          <Image src='/bell.png' alt='Bell' width={32} height={32} className='w-8 h-8' />
+          <Image
+            src='/bell.png'
+            alt='Bell'
+            width={32}
+            height={32}
+            className='w-8 h-8'
+          />
           <button className='p-2 -mr-2 rounded-full hover:bg-black/10 transition-colors'>
             <WalletIcon className='w-6 h-6' />
           </button>
@@ -97,10 +107,19 @@ export default function SwipePage() {
     <div className='min-h-screen bg-primary flex flex-col safe-area-inset-top safe-area-inset-bottom'>
       {/* Header */}
       <div className='flex items-center justify-between p-4'>
-        <button className='p-2 -ml-2 rounded-full hover:bg-black/10 transition-colors'>
+        <button
+          onClick={handleStartOver}
+          className='p-2 -ml-2 rounded-full hover:bg-black/10 transition-colors'
+        >
           <RotateCcw className='w-6 h-6' />
         </button>
-        <Image src='/bell.png' alt='Bell' width={32} height={32} className='w-8 h-8' />
+        <Image
+          src='/bell.png'
+          alt='Bell'
+          width={32}
+          height={32}
+          className='w-8 h-8'
+        />
         <button className='p-2 -mr-2 rounded-full hover:bg-black/10 transition-colors'>
           <WalletIcon className='w-6 h-6' />
         </button>
@@ -134,12 +153,7 @@ export default function SwipePage() {
               transition={{ duration: 0.2 }}
               className='w-full'
             >
-              <SwipableCard
-                token={currentToken}
-                onSwipe={handleSwipe}
-                onDump={handleDump}
-                onKeep={handleKeep}
-              />
+              <SwipableCard token={currentToken} onSwipe={handleSwipe} />
             </motion.div>
           )}
         </AnimatePresence>

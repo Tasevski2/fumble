@@ -1,22 +1,72 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useRef } from 'react';
-import { motion } from 'framer-motion';
-import { Share } from 'lucide-react';
+import { useRef, useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Share, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/state/useAppStore';
+import { useWallet } from '@/hooks/useWallet';
+import { useOrderExecutor } from '@/lib/executor';
 
 export default function SuccessPage() {
   const router = useRouter();
-  const { dumpTokens } = useAppStore();
+  const { dumpTokens, orders, sessions } = useAppStore();
+  const { getSession } = useWallet();
+  const { executePurge } = useOrderExecutor();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executionComplete, setExecutionComplete] = useState(false);
+  const [executionError, setExecutionError] = useState<string | null>(null);
 
   const totalValue = dumpTokens.reduce(
     (sum, token) => sum + token.balanceUsd,
     0
   );
   const tokenCount = dumpTokens.length;
+
+  // Execute orders when component mounts
+  useEffect(() => {
+    const executeOrders = async () => {
+      if (dumpTokens.length === 0 || isExecuting || executionComplete) return;
+      
+      setIsExecuting(true);
+      setExecutionError(null);
+      
+      try {
+        // Get all required session handles
+        const requiredChains = Array.from(new Set(dumpTokens.map(token => token.chainId)));
+        const sessionHandles: Record<number, any> = {};
+        
+        for (const chainId of requiredChains) {
+          const session = getSession(chainId);
+          if (!session) {
+            throw new Error(`No session available for chain ${chainId}`);
+          }
+          sessionHandles[chainId] = session;
+        }
+        
+        // Execute the purge
+        await executePurge(sessionHandles);
+        setExecutionComplete(true);
+      } catch (error) {
+        console.error('Order execution failed:', error);
+        setExecutionError(error instanceof Error ? error.message : 'Execution failed');
+      } finally {
+        setIsExecuting(false);
+      }
+    };
+
+    executeOrders();
+  }, [dumpTokens, executePurge, getSession, isExecuting, executionComplete]);
+
+  // Calculate execution stats
+  const executedOrders = orders.filter(order => order.status === 'executed');
+  const failedOrders = orders.filter(order => order.status === 'failed');
+  const actualValue = executedOrders.reduce((sum, order) => 
+    sum + parseFloat(order.estimatedUSDC), 0
+  );
 
   const createShareImage = async () => {
     const canvas = canvasRef.current;
@@ -189,70 +239,139 @@ export default function SuccessPage() {
 
       {/* Content */}
       <div className='flex-1 flex flex-col items-center justify-center px-6'>
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, type: 'spring' }}
-          className='text-center'
-        >
-          {/* Success Icon */}
-          <div className='w-32 h-32 bg-white rounded-full mx-auto mb-8 flex items-center justify-center'>
-            <motion.span
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
-              className='text-6xl'
+        <AnimatePresence mode='wait'>
+          {isExecuting && (
+            <motion.div
+              key='executing'
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.6, type: 'spring' }}
+              className='text-center'
             >
-              🔔
-            </motion.span>
-          </div>
+              {/* Loading Icon */}
+              <div className='w-32 h-32 bg-white rounded-full mx-auto mb-8 flex items-center justify-center'>
+                <Loader2 className='w-16 h-16 text-primary animate-spin' />
+              </div>
 
-          {/* Success Message */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className='bg-white rounded-2xl p-8 mb-8 max-w-sm mx-auto'
+              {/* Execution Message */}
+              <div className='bg-white rounded-2xl p-8 mb-8 max-w-sm mx-auto'>
+                <h1 className='text-2xl font-bold text-gray-900 mb-4'>
+                  Purging Tokens...
+                </h1>
+                <p className='text-gray-700 mb-4'>
+                  Submitting {tokenCount} orders across chains
+                </p>
+                
+                {/* Progress */}
+                <div className='space-y-2'>
+                  <div className='text-sm text-gray-600'>
+                    {executedOrders.length + failedOrders.length} / {tokenCount} processed
+                  </div>
+                  <div className='w-full bg-gray-200 rounded-full h-2'>
+                    <div 
+                      className='bg-primary h-2 rounded-full transition-all duration-300'
+                      style={{ 
+                        width: `${((executedOrders.length + failedOrders.length) / tokenCount) * 100}%` 
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {(executionComplete || executionError) && (
+            <motion.div
+              key='complete'
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, type: 'spring' }}
+              className='text-center'
+            >
+              {/* Success/Error Icon */}
+              <div className='w-32 h-32 bg-white rounded-full mx-auto mb-8 flex items-center justify-center'>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
+                >
+                  {executionError ? (
+                    <XCircle className='w-16 h-16 text-red-500' />
+                  ) : (
+                    <CheckCircle className='w-16 h-16 text-green-500' />
+                  )}
+                </motion.div>
+              </div>
+
+              {/* Results Message */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className='bg-white rounded-2xl p-8 mb-8 max-w-sm mx-auto'
+              >
+                {executionError ? (
+                  <>
+                    <h1 className='text-2xl font-bold text-gray-900 mb-4'>
+                      Purge Failed
+                    </h1>
+                    <p className='text-red-600 mb-4'>{executionError}</p>
+                    <p className='text-gray-700'>
+                      Some orders may have been processed. Check your wallet.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h1 className='text-2xl font-bold text-gray-900 mb-4'>
+                      You Just Fumbled!
+                    </h1>
+                    <div className='space-y-2 mb-6'>
+                      <p className='text-lg font-semibold text-gray-900'>
+                        {executedOrders.length} Tokens Purged
+                      </p>
+                      <p className='text-3xl font-bold text-success'>
+                        ${actualValue.toFixed(2)} rescued
+                      </p>
+                      {failedOrders.length > 0 && (
+                        <p className='text-sm text-orange-600'>
+                          {failedOrders.length} orders failed
+                        </p>
+                      )}
+                    </div>
+                    <p className='text-gray-700'>
+                      You can now open your wallet in public again.
+                    </p>
+                  </>
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Action Buttons - Only show when execution is complete */}
+      {(executionComplete || executionError) && (
+        <div className='p-6 space-y-3'>
+          {!executionError && (
+            <Button
+              onClick={handleShare}
+              className='w-full bg-[linear-gradient(to_bottom,_#47474D_0%,_#47474D_35%,_#1B1B1D_100%)] disabled:opacity-30 text-white h-14 rounded-2xl text-lg font-medium mb-4'
+            >
+              <Share className='w-5 h-5 mr-2' />
+              SHARE MY FUMBLE
+            </Button>
+          )}
+
+          <Button
+            onClick={resetApp}
+            variant='outline'
+            className='w-full border-0 bg-transparent hover:bg-transparent active:bg-transparent focus:bg-transparent text-gray-900 hover:text-gray-700 h-14 rounded-full text-lg font-medium transition-colors'
           >
-            <h1 className='text-2xl font-bold text-gray-900 mb-4'>
-              You Just Fumbled!
-            </h1>
-            <div className='space-y-2 mb-6'>
-              <p className='text-lg font-semibold text-gray-900'>
-                {tokenCount} Tokens
-              </p>
-              <p className='text-3xl font-bold text-success'>
-                ${totalValue.toFixed(2)} saved.
-              </p>
-              <p className='text-sm text-gray-600'>
-                More than your last 3 trades combined.
-              </p>
-            </div>
-            <p className='text-gray-700'>
-              You can now open your wallet in public again.
-            </p>
-          </motion.div>
-        </motion.div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className='p-6 space-y-3'>
-        <Button
-          onClick={handleShare}
-          className='w-full bg-[linear-gradient(to_bottom,_#47474D_0%,_#47474D_35%,_#1B1B1D_100%)] disabled:opacity-30 text-white h-14 rounded-2xl text-lg font-medium mb-4'
-        >
-          <Share className='w-5 h-5 mr-2' />
-          SHARE MY FUMBLE
-        </Button>
-
-        <Button
-          onClick={resetApp}
-          variant='outline'
-          className='w-full border-0 bg-transparent hover:bg-transparent active:bg-transparent focus:bg-transparent text-gray-900 hover:text-gray-700 h-14 rounded-full text-lg font-medium transition-colors'
-        >
-          ANOTHER WALLET
-        </Button>
-      </div>
+            {executionError ? 'TRY AGAIN' : 'ANOTHER WALLET'}
+          </Button>
+        </div>
+      )}
 
       {/* Hidden Canvas for generating share image */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />

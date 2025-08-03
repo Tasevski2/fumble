@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { ArrowLeft, X } from 'lucide-react';
+import { ArrowLeft, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/state/useAppStore';
 import { z } from 'zod';
+import { scanAddresses, mockScanAddresses } from '@/lib/scanner';
 
 // Ethereum address validation schema
 const addressSchema = z
@@ -15,16 +16,24 @@ const addressSchema = z
 
 export default function EnterAddressesPage() {
   const router = useRouter();
-  const { addresses, addAddress, removeAddress } = useAppStore();
+  const {
+    addresses,
+    addAddress,
+    removeAddress,
+    setTokens,
+    trashThreshold,
+    setIsScanning,
+  } = useAppStore();
   const [inputValue, setInputValue] = useState('');
   const [showError, setShowError] = useState(false);
   const [isPasting, setIsPasting] = useState(false);
+  const [isScanning, setIsScanningLocal] = useState(false);
 
   const handlePaste = async () => {
     if (isPasting) return; // Prevent multiple paste operations
-    
+
     setIsPasting(true);
-    
+
     try {
       const text = await navigator.clipboard.readText();
       setInputValue(text);
@@ -33,7 +42,7 @@ export default function EnterAddressesPage() {
       // Fallback for browsers that don't support clipboard API
       console.error('Failed to read clipboard:', err);
     }
-    
+
     // Reset pasting flag after a short delay
     setTimeout(() => {
       setIsPasting(false);
@@ -45,10 +54,10 @@ export default function EnterAddressesPage() {
     if (!trimmedAddress) return;
 
     // Check if address already exists
-    const addressExists = addresses.some(addr => 
-      addr.address.toLowerCase() === trimmedAddress.toLowerCase()
+    const addressExists = addresses.some(
+      (addr) => addr.address.toLowerCase() === trimmedAddress.toLowerCase()
     );
-    
+
     if (addressExists) {
       setInputValue('');
       setShowError(false);
@@ -62,6 +71,36 @@ export default function EnterAddressesPage() {
       setShowError(false);
     } catch (error) {
       setShowError(true);
+    }
+  };
+
+  const handleScanAddresses = async () => {
+    if (addresses.length === 0) return;
+
+    setIsScanningLocal(true);
+    setIsScanning(true);
+
+    try {
+      const addressList = addresses.map((addr) => addr.address);
+
+      // For now, use mock data. Change to scanAddresses for real implementation
+      const tokens =
+        process.env.NEXT_PUBLIC_ENABLE_MOCKS === 'true'
+          ? await mockScanAddresses(addressList, trashThreshold)
+          : await scanAddresses(addressList, trashThreshold);
+      console.log(tokens);
+      setTokens(tokens);
+      router.push('/limit');
+    } catch (error) {
+      console.error('Scanning error:', error);
+      // For now, proceed with mock data on error
+      const addressList = addresses.map((addr) => addr.address);
+      const tokens = await mockScanAddresses(addressList, trashThreshold);
+      setTokens(tokens);
+      router.push('/limit');
+    } finally {
+      setIsScanningLocal(false);
+      setIsScanning(false);
     }
   };
 
@@ -102,9 +141,13 @@ export default function EnterAddressesPage() {
                   const value = e.target.value;
                   setInputValue(value);
                   setShowError(false);
-                  
+
                   // Auto-validate and add if it's a complete ethereum address (but not during paste)
-                  if (!isPasting && value.length === 42 && value.startsWith('0x')) {
+                  if (
+                    !isPasting &&
+                    value.length === 42 &&
+                    value.startsWith('0x')
+                  ) {
                     validateAndAddAddress(value);
                   }
                 }}
@@ -116,14 +159,14 @@ export default function EnterAddressesPage() {
                 onPaste={(e) => {
                   // Handle paste directly on the input
                   if (isPasting) return; // Prevent duplicate handling
-                  
+
                   setIsPasting(true);
                   const pastedText = e.clipboardData?.getData('text') || '';
                   if (pastedText) {
                     setInputValue(pastedText);
                     validateAndAddAddress(pastedText);
                   }
-                  
+
                   // Reset pasting flag
                   setTimeout(() => {
                     setIsPasting(false);
@@ -138,8 +181,8 @@ export default function EnterAddressesPage() {
               />
               <Button
                 onClick={handlePaste}
-                size="sm"
-                variant="secondary"
+                size='sm'
+                variant='secondary'
                 className='absolute right-2 top-1/2 -translate-y-1/2 h-8 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 border-0'
               >
                 Paste
@@ -180,11 +223,18 @@ export default function EnterAddressesPage() {
       {/* CTA Button */}
       <div className='p-6 py-8 bg-primary-light'>
         <Button
-          onClick={() => router.push('/limit')}
-          disabled={!canProceed}
+          onClick={handleScanAddresses}
+          disabled={!canProceed || isScanning}
           className='w-full bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 text-white h-14 rounded-full text-lg font-medium'
         >
-          SCAN ADDRESSES
+          {isScanning ? (
+            <>
+              <Loader2 className='w-5 h-5 animate-spin mr-2' />
+              SCANNING...
+            </>
+          ) : (
+            'SCAN ADDRESSES'
+          )}
         </Button>
       </div>
     </div>

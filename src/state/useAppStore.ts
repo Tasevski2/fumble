@@ -117,6 +117,31 @@ export const useAppStore = create<AppState>()(
           ),
         }))
       },
+
+      // Reset app state - clears all transient data but keeps persistent data
+      resetAppState: () => {
+        set((state) => ({
+          // Reset all transient data to initial values
+          tokens: [],
+          currentTokenIndex: 0,
+          swipeActions: [],
+          dumpTokens: [],
+          keepTokens: [],
+          orders: [],
+          isScanning: false,
+          
+          // Keep persistent data unchanged
+          addresses: state.addresses,
+          trashThreshold: state.trashThreshold,
+          sessions: state.sessions,
+        }))
+      },
+
+      // Get tokens filtered by trash threshold
+      getTrashTokens: () => {
+        const state = get()
+        return state.tokens.filter(token => token.balanceUsd <= state.trashThreshold)
+      },
     }),
     {
       name: 'fumble-storage',

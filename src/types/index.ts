@@ -91,4 +91,8 @@ export interface AppState {
   orders: OrderIntent[]
   addOrder: (order: OrderIntent) => void
   updateOrder: (orderId: string, updates: Partial<OrderIntent>) => void
+  
+  // App state management
+  resetAppState: () => void
+  getTrashTokens: () => Token[]
 }

@@ -9,20 +9,14 @@ import {
   formatChange,
   getRandomQuip,
 } from '@/utils/mock';
+import Image from 'next/image';
 
 interface SwipableCardProps {
   token: Token;
   onSwipe: (direction: 'left' | 'right') => void;
-  onDump: () => void;
-  onKeep: () => void;
 }
 
-export function SwipableCard({
-  token,
-  onSwipe,
-  onDump,
-  onKeep,
-}: SwipableCardProps) {
+export function SwipableCard({ token, onSwipe }: SwipableCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-200, 200], [-30, 30]);
@@ -45,13 +39,11 @@ export function SwipableCard({
       (info.offset.x > 25 && swipeVelocity > 500)
     ) {
       onSwipe('right');
-      onKeep();
     } else if (
       info.offset.x < -threshold ||
       (info.offset.x < -25 && swipeVelocity > 500)
     ) {
       onSwipe('left');
-      onDump();
     }
   };
 
@@ -89,9 +81,11 @@ export function SwipableCard({
           <div className='flex items-center gap-4 mb-4'>
             <div className='w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0'>
               {token.logoUrl ? (
-                <img
+                <Image
                   src={token.logoUrl}
                   alt={token.symbol}
+                  width={40}
+                  height={40}
                   className='w-10 h-10 rounded-full'
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = 'none';
@@ -115,13 +109,6 @@ export function SwipableCard({
             <p className='font-bold text-3xl text-gray-900 mb-1'>
               ${token.balanceUsd.toFixed(2)}
             </p>
-            <p
-              className={`text-base font-semibold ${getChangeColor(
-                token.change24h
-              )}`}
-            >
-              {formatChange(token.change24h)}
-            </p>
           </div>
         </div>
 
@@ -139,7 +126,7 @@ export function SwipableCard({
               Balance
             </p>
             <p className='font-mono text-xl font-semibold'>
-              {formatBalance(token.balance)}
+              {formatBalance(token.balanceUsd, 0)}$
             </p>
           </div>
           <div className='text-center'>
