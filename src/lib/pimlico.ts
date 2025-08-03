@@ -17,15 +17,25 @@ const CHAIN_MAP = {
 // Get Pimlico bundler URL for chain
 export function getPimlicoBundlerUrl(chainId: number): string {
   // Convert chainId to network name for v1 endpoint (EntryPoint v0.7)
-  const networkName = chainId === 42161 ? 'arbitrum' : chainId === 8453 ? 'base' : chainId.toString();
-  return `https://api.pimlico.io/v1/${networkName}/rpc?apikey=pim_QsvgBBkfpSZvRfnntLTLVB`;
+  const networkName =
+    chainId === 42161
+      ? 'arbitrum'
+      : chainId === 8453
+      ? 'base'
+      : chainId.toString();
+  return `https://api.pimlico.io/v1/${networkName}/rpc?$apikey=${process.env.NEXT_PUBLIC_PIMLICO_API_KEY}`; // this should be on the backend
 }
 
 // Get Pimlico paymaster URL for chain
 export function getPimlicoPaymasterUrl(chainId: number): string {
   // Use correct Pimlico paymaster endpoint format (v2 for paymaster operations)
-  const networkName = chainId === 42161 ? 'arbitrum' : chainId === 8453 ? 'base' : chainId.toString();
-  return `https://api.pimlico.io/v2/${networkName}/rpc?apikey=pim_QsvgBBkfpSZvRfnntLTLVB`;
+  const networkName =
+    chainId === 42161
+      ? 'arbitrum'
+      : chainId === 8453
+      ? 'base'
+      : chainId.toString();
+  return `https://api.pimlico.io/v2/${networkName}/rpc?apikey=${process.env.NEXT_PUBLIC_PIMLICO_API_KEY}`; // this should be on the backend
 }
 
 // Create Pimlico bundler client
@@ -92,7 +102,7 @@ export function createSponsoredSmartAccountClient({
           // Get gas prices from Pimlico bundler
           const gasPrice = await pimlicoBundler.getUserOperationGasPrice();
           console.log('💰 Gas price estimation:', gasPrice);
-          
+
           return {
             maxFeePerGas: gasPrice.fast.maxFeePerGas,
             maxPriorityFeePerGas: gasPrice.fast.maxPriorityFeePerGas,
@@ -164,10 +174,11 @@ export async function sendSponsoredUserOperation({
     value?: bigint;
   }>;
 }) {
-  const { smartAccountClient, pimlicoBundler } = createSponsoredSmartAccountClient({
-    chainId,
-    smartAccount,
-  });
+  const { smartAccountClient, pimlicoBundler } =
+    createSponsoredSmartAccountClient({
+      chainId,
+      smartAccount,
+    });
 
   try {
     console.log('🚀 Sending sponsored UserOperation...', {
@@ -186,13 +197,13 @@ export async function sendSponsoredUserOperation({
         fast: {
           maxFeePerGas: BigInt('0x59682f00'), // 1.5 gwei
           maxPriorityFeePerGas: BigInt('0x59682f00'), // 1.5 gwei
-        }
+        },
       };
     }
 
     // Create UserOperation with proper gas parameters
     console.log('🏗️ Preparing UserOperation for sponsorship...');
-    
+
     // Use the smart account client to send a sponsored UserOperation
     // This should handle gas estimation and paymaster integration automatically
     const userOpHash = await smartAccountClient.sendUserOperation({
@@ -200,7 +211,10 @@ export async function sendSponsoredUserOperation({
       // Let the smart account client handle sponsorship internally
     });
 
-    console.log('📤 Sponsored UserOperation submitted successfully:', userOpHash);
+    console.log(
+      '📤 Sponsored UserOperation submitted successfully:',
+      userOpHash
+    );
 
     return {
       userOpHash,

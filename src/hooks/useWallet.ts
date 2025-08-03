@@ -82,7 +82,7 @@ export function useWallet() {
   // Check if MetaMask is available
   const isMetaMaskAvailable = useCallback(() => {
     const metaMaskConnector = connectors.find(
-      (connector) => connector.id === 'metaMask'
+      (connector) => connector.id === 'metaMask' || connector.id === 'injected'
     );
     return !!metaMaskConnector;
   }, [connectors]);
@@ -95,7 +95,6 @@ export function useWallet() {
       );
     }
 
-    // Additional check for window.ethereum to ensure MetaMask is properly installed
     if (typeof window !== 'undefined' && !window.ethereum?.isMetaMask) {
       throw new Error(
         'MetaMask extension not detected. Please ensure MetaMask is installed and enabled.'
@@ -124,22 +123,23 @@ export function useWallet() {
     }
   }, [updateSession]);
 
-  // Connect wallet using MetaMask only
+  // Connect wallet using MetaMask
   const connect = useCallback(
     async (addressId: string) => {
       setError(null);
 
       try {
-        // Validate MetaMask installation first
         validateMetaMask();
 
-        // Get MetaMask connector
-        const metaMaskConnector = connectors.find(
-          (connector) => connector.id === 'metaMask'
-        );
+        // Get MetaMask connector (prefer metaMask, fallback to injected)
+        let metaMaskConnector = connectors.find(c => c.id === 'metaMask');
+        
+        if (!metaMaskConnector) {
+          metaMaskConnector = connectors.find(c => c.id === 'injected');
+        }
 
-        console.log('🔗 Available connectors:', connectors);
-        console.log('🔗 MetaMask connector found:', !!metaMaskConnector);
+        console.log('🔗 Available connectors:', connectors.map(c => c.id));
+        console.log('🔗 Using connector:', metaMaskConnector?.id);
 
         if (!metaMaskConnector) {
           throw new Error(
@@ -164,7 +164,7 @@ export function useWallet() {
         // to prevent race conditions and infinite loops
       } catch (err: any) {
         setError(err.message || 'MetaMask connection failed');
-        console.error('🔗 MetaMask connection error:', err);
+        console.error('🔗 Connection error:', err);
       }
     },
     [wagmiConnect, connectors, validateMetaMask]
@@ -308,14 +308,20 @@ export function useWallet() {
     [sessions]
   );
 
+
   // Update addresses when account changes - avoid infinite loop by not depending on addresses array
   useEffect(() => {
     const currentAddresses = useAppStore.getState().addresses;
 
     if (isConnected && address && chainId) {
-      // Validate that we're connected to MetaMask and not another wallet
+      console.log('✅ Connection established:', { 
+        address, 
+        chainId
+      });
+
+      // Validate connector type
       const connectedConnector = connectors.find(
-        (connector) => connector.id === 'metaMask'
+        (connector) => connector.id === 'metaMask' || connector.id === 'injected'
       );
 
       if (!connectedConnector) {
@@ -326,7 +332,7 @@ export function useWallet() {
         return;
       }
 
-      console.log('✅ Confirmed MetaMask connection:', {
+      console.log('✅ MetaMask connection confirmed:', {
         address,
         chainId,
         connector: connectedConnector.id,

@@ -101,6 +101,7 @@ export default function SummaryPage() {
   };
 
   const handleEnableSession = async (chainId: number) => {
+    console.log('CLICKED');
     setInitializingSessions((prev) => ({ ...prev, [chainId]: true }));
     try {
       console.log(`🔗 Starting session initialization for chain ${chainId}...`);
@@ -416,7 +417,12 @@ export default function SummaryPage() {
             {/* Backdrop */}
             <motion.div
               className='fixed inset-0 bg-gray-500/20 z-[70]'
-              onClick={closeModal}
+              onMouseDown={(e) => {
+                // Only close if clicking on backdrop itself, not on modal content
+                if (e.target === e.currentTarget) {
+                  closeModal();
+                }
+              }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -428,7 +434,7 @@ export default function SummaryPage() {
               className='fixed left-0 right-0 bg-primary z-[80] rounded-t-3xl overflow-hidden'
               style={{ bottom: 0 }}
               initial={{ y: '100%' }}
-              animate={{ y: `-${Math.max(footerHeight + 16, 100)}px` }}
+              animate={{ y: `-${Math.max(footerHeight, 100)}px` }}
               exit={{
                 y: '100%',
                 transition: { duration: 0.3, ease: 'easeIn' },
@@ -487,16 +493,16 @@ export default function SummaryPage() {
                         variant={addr.isConnected ? 'secondary' : 'default'}
                         size='sm'
                         className={cn(
-                          'relative z-10 cursor-pointer touch-manipulation select-none',
+                          'relative z-20 cursor-pointer touch-manipulation select-none',
                           addr.isConnected
                             ? 'bg-success text-white hover:bg-success/90 active:bg-success/80'
                             : 'bg-white text-primary-foreground hover:bg-white/90 active:bg-white/80'
                         )}
-                        style={{ 
+                        style={{
                           touchAction: 'manipulation',
                           WebkitTapHighlightColor: 'transparent',
                           minHeight: '44px',
-                          minWidth: '44px'
+                          minWidth: '44px',
                         }}
                       >
                         {isConnecting
@@ -521,7 +527,12 @@ export default function SummaryPage() {
             {/* Backdrop */}
             <motion.div
               className='fixed inset-0 bg-gray-500/20 z-[70]'
-              onClick={closeModal}
+              onMouseDown={(e) => {
+                // Only close if clicking on backdrop itself, not on modal content
+                if (e.target === e.currentTarget) {
+                  closeModal();
+                }
+              }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -533,14 +544,14 @@ export default function SummaryPage() {
               className='fixed left-0 right-0 bg-primary z-[80] rounded-t-3xl overflow-hidden'
               style={{ bottom: 0 }}
               initial={{ y: '100%' }}
-              animate={{ y: `-${Math.max(footerHeight + 16, 100)}px` }}
+              animate={{ y: `-${Math.max(footerHeight, 100)}px` }}
               exit={{
                 y: '100%',
                 transition: { duration: 0.3, ease: 'easeIn' },
               }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             >
-              <div className='p-6'>
+              <div className='p-6 relative'>
                 <h1 className='text-2xl text-center font-bold text-primary-foreground mb-6'>
                   Enable gasless trading
                 </h1>
@@ -559,7 +570,7 @@ export default function SummaryPage() {
                         key={chainId}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className='flex items-center justify-between p-3 bg-white/20 rounded-xl'
+                        className='flex items-center justify-between p-3 bg-white/20 rounded-xl relative'
                       >
                         <div className='flex items-center gap-3'>
                           <div className='w-10 h-10 bg-white/30 rounded-full flex items-center justify-center'>
@@ -585,28 +596,25 @@ export default function SummaryPage() {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
+                            console.log(
+                              '🎯 Enable button clicked for chain:',
+                              chainId
+                            );
                             handleEnableSession(chainId);
-                          }}
-                          onTouchStart={(e) => {
-                            e.stopPropagation();
-                          }}
-                          onTouchEnd={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
                           }}
                           disabled={isEnabled || isInitializing}
                           size='sm'
                           className={cn(
-                            'relative z-10 cursor-pointer touch-manipulation select-none',
+                            'relative z-20 cursor-pointer touch-manipulation select-none',
                             isEnabled
                               ? 'bg-green-500 text-white hover:bg-green-600 active:bg-green-700'
                               : 'bg-white text-primary-foreground hover:bg-white/90 active:bg-white/80'
                           )}
-                          style={{ 
+                          style={{
                             touchAction: 'manipulation',
                             WebkitTapHighlightColor: 'transparent',
                             minHeight: '44px',
-                            minWidth: '44px'
+                            minWidth: '44px',
                           }}
                         >
                           {isInitializing
@@ -631,7 +639,7 @@ export default function SummaryPage() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      
+
                       // Double-check all sessions are enabled before navigating
                       const missingChains = chainsToEnable.filter(
                         (chainId) => !hasSession(chainId)
@@ -668,12 +676,12 @@ export default function SummaryPage() {
                     )}
                     className={cn(
                       'w-full bg-white text-primary-foreground hover:bg-white/90 active:bg-white/80 h-12 rounded-xl font-medium touch-manipulation select-none',
-                      'relative z-10 cursor-pointer'
+                      'relative z-20 cursor-pointer'
                     )}
-                    style={{ 
+                    style={{
                       touchAction: 'manipulation',
                       WebkitTapHighlightColor: 'transparent',
-                      minHeight: '48px'
+                      minHeight: '48px',
                     }}
                   >
                     {Object.values(initializingSessions).some((v) => v)
