@@ -3,12 +3,13 @@ const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
   images: {
-    domains: ['tokens.1inch.io', 'raw.githubusercontent.com'],
+    unoptimized: true,
+    // domains: ['tokens.1inch.io', 'raw.githubusercontent.com'],
   },
   webpack: (config) => {
-    config.resolve.fallback = { 
-      fs: false, 
-      net: false, 
+    config.resolve.fallback = {
+      fs: false,
+      net: false,
       tls: false,
       encoding: false,
       stream: false,
@@ -16,6 +17,6 @@ const nextConfig = {
     };
     return config;
   },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

@@ -16,7 +16,7 @@ export async function executePurgeOrders(
   // Pre-validate liquidity for all tokens
   console.log('Validating liquidity for batch execution...');
   const liquidityValidation = await validateBatchLiquidity(
-    dumpTokens.map(token => ({
+    dumpTokens.map((token) => ({
       chainId: token.chainId,
       address: token.address,
       amount: token.balance,
@@ -26,11 +26,14 @@ export async function executePurgeOrders(
 
   // Log liquidity warnings
   const tokensWithLowLiquidity = liquidityValidation.filter(
-    v => !v.liquidity.hasLiquidity
+    (v) => !v.liquidity.hasLiquidity
   );
-  
+
   if (tokensWithLowLiquidity.length > 0) {
-    console.warn('Tokens with low/no liquidity:', tokensWithLowLiquidity.map(t => t.tokenSymbol));
+    console.warn(
+      'Tokens with low/no liquidity:',
+      tokensWithLowLiquidity.map((t) => t.tokenSymbol)
+    );
   }
   // Group tokens by chain
   const tokensByChain = dumpTokens.reduce((acc, token) => {
@@ -45,7 +48,7 @@ export async function executePurgeOrders(
   for (const [chainId, tokens] of Object.entries(tokensByChain)) {
     const chainIdNum = parseInt(chainId);
     const sessionHandle = sessionHandles[chainIdNum];
-    
+
     if (!sessionHandle) {
       console.error(`No session handle for chain ${chainId}`);
       continue;
@@ -60,7 +63,7 @@ export async function executePurgeOrders(
     // Process each token on this chain
     for (const token of tokens) {
       const orderId = `order_${Date.now()}_${token.id}`;
-      
+
       // Create initial order intent
       const orderIntent: OrderIntent = {
         id: orderId,
@@ -78,11 +81,13 @@ export async function executePurgeOrders(
 
       // Check if this token had liquidity issues
       const liquidityCheck = liquidityValidation.find(
-        v => v.tokenSymbol === token.symbol
+        (v) => v.tokenSymbol === token.symbol
       );
 
       if (liquidityCheck && !liquidityCheck.liquidity.hasLiquidity) {
-        console.warn(`Low liquidity for ${token.symbol}, proceeding with caution...`);
+        console.warn(
+          `Low liquidity for ${token.symbol}, proceeding with caution...`
+        );
       }
 
       // Retry logic with exponential backoff
@@ -113,7 +118,7 @@ export async function executePurgeOrders(
 
           // Sign and submit order
           updateOrder(orderId, { status: 'submitted' });
-          
+
           const orderHash = await signAndSubmitOrder(
             sessionHandle,
             typedData,
@@ -122,12 +127,12 @@ export async function executePurgeOrders(
           );
 
           // Order successfully submitted
-          updateOrder(orderId, { 
+          updateOrder(orderId, {
             status: 'executed',
             orderHash,
             estimatedUSDC: (parseFloat(quote.toAmountMin) / 1e6).toFixed(2), // Convert USDC amount
           });
-          
+
           logger.orderStatusChanged(orderId, 'submitted', 'executed');
           logger.info('Order execution successful', {
             orderId,
@@ -139,24 +144,28 @@ export async function executePurgeOrders(
 
           // Success - break retry loop
           break;
-
         } catch (error) {
-          lastError = error instanceof Error ? error : new Error('Unknown error');
+          console.log(error);
+          lastError =
+            error instanceof Error ? error : new Error('Unknown error');
           retryCount++;
 
-          console.error(`Attempt ${retryCount} failed for ${token.symbol}:`, lastError.message);
+          console.error(
+            `Attempt ${retryCount} failed for ${token.symbol}:`,
+            lastError.message
+          );
 
           if (retryCount <= maxRetries) {
             // Exponential backoff: 1s, 2s, 4s
             const delay = Math.pow(2, retryCount - 1) * 1000;
             console.log(`Retrying ${token.symbol} in ${delay}ms...`);
-            
-            updateOrder(orderId, { 
+
+            updateOrder(orderId, {
               status: 'pending',
               error: `Retry ${retryCount}/${maxRetries}: ${lastError.message}`,
             });
-            
-            await new Promise(resolve => setTimeout(resolve, delay));
+
+            await new Promise((resolve) => setTimeout(resolve, delay));
           } else {
             // All retries exhausted
             console.error(`All retries exhausted for ${token.symbol}`);
@@ -164,7 +173,7 @@ export async function executePurgeOrders(
               status: 'failed',
               error: `Failed after ${maxRetries} retries: ${lastError.message}`,
             });
-            
+
             logger.orderExecutionFailed(orderId, lastError, maxRetries);
             logger.orderStatusChanged(orderId, 'pending', 'failed');
           }
@@ -178,7 +187,9 @@ export async function executePurgeOrders(
 export function useOrderExecutor() {
   const { dumpTokens, sessions, addOrder, updateOrder } = useAppStore();
 
-  const executePurge = async (sessionHandles: Record<number, SessionHandle>) => {
+  const executePurge = async (
+    sessionHandles: Record<number, SessionHandle>
+  ) => {
     await executePurgeOrders(sessionHandles, dumpTokens, addOrder, updateOrder);
   };
 

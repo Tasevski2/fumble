@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Share, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,14 +11,21 @@ import { useOrderExecutor } from '@/lib/executor';
 
 export default function SuccessPage() {
   const router = useRouter();
-  const { dumpTokens, orders, sessions } = useAppStore();
-  const { getSession } = useWallet();
+  const { dumpTokens, orders, sessions, resetAppState } = useAppStore();
+  const { getSession, initializeSession, hasSession } = useWallet();
   const { executePurge } = useOrderExecutor();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  
+  const executionStartedRef = useRef(false); // Prevent multiple executions
+
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionComplete, setExecutionComplete] = useState(false);
   const [executionError, setExecutionError] = useState<string | null>(null);
+  const [isInitializingSessions, setIsInitializingSessions] = useState(false);
+  const [sessionInitError, setSessionInitError] = useState<string | null>(null);
+  const [sessionInitProgress, setSessionInitProgress] = useState<string>('');
+
+  // Consolidated loading state to prevent flickering
+  const isLoading = isInitializingSessions || isExecuting;
 
   const totalValue = dumpTokens.reduce(
     (sum, token) => sum + token.balanceUsd,
@@ -26,46 +33,144 @@ export default function SuccessPage() {
   );
   const tokenCount = dumpTokens.length;
 
+  // Check and initialize missing sessions
+  const initializeMissingSessions = useCallback(async () => {
+    const requiredChains = Array.from(
+      new Set(dumpTokens.map((token) => token.chainId))
+    );
+    const missingChains = requiredChains.filter(
+      (chainId) => !hasSession(chainId)
+    );
+
+    if (missingChains.length === 0) {
+      return true; // All sessions already exist
+    }
+
+    console.log('🔗 Missing sessions for chains:', missingChains);
+    setIsInitializingSessions(true);
+    setSessionInitError(null);
+
+    try {
+      // Initialize sessions for missing chains sequentially
+      for (let i = 0; i < missingChains.length; i++) {
+        const chainId = missingChains[i];
+        const chainName =
+          chainId === 42161
+            ? 'Arbitrum'
+            : chainId === 8453
+            ? 'Base'
+            : `Chain ${chainId}`;
+
+        setSessionInitProgress(
+          `Creating smart account on ${chainName}... (${i + 1}/${
+            missingChains.length
+          })`
+        );
+        console.log(`🔗 Initializing session for chain ${chainId}...`);
+
+        await initializeSession(chainId);
+        console.log(`✅ Session initialized for chain ${chainId}`);
+      }
+
+      console.log('✅ All sessions initialized successfully');
+      setSessionInitProgress('Smart accounts created successfully!');
+      return true;
+    } catch (error) {
+      console.error('❌ Session initialization failed:', error);
+      setSessionInitError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to initialize smart account sessions'
+      );
+      return false;
+    } finally {
+      setIsInitializingSessions(false);
+      // Clear progress after a brief delay
+      setTimeout(() => setSessionInitProgress(''), 1000);
+    }
+  }, [dumpTokens, hasSession, initializeSession]);
+
   // Execute orders when component mounts
   useEffect(() => {
     const executeOrders = async () => {
-      if (dumpTokens.length === 0 || isExecuting || executionComplete) return;
-      
-      setIsExecuting(true);
+      // Prevent multiple simultaneous executions
+      if (
+        executionStartedRef.current ||
+        dumpTokens.length === 0 ||
+        isExecuting ||
+        executionComplete
+      ) {
+        console.log('🛑 Execution blocked:', {
+          alreadyStarted: executionStartedRef.current,
+          noTokens: dumpTokens.length === 0,
+          isExecuting,
+          executionComplete,
+        });
+        return;
+      }
+
+      executionStartedRef.current = true;
+      console.log('🚀 Starting order execution...');
+
       setExecutionError(null);
-      
+      setSessionInitError(null);
+
       try {
+        // First, ensure all required sessions are initialized
+        const sessionsReady = await initializeMissingSessions();
+        if (!sessionsReady) {
+          return; // Session initialization failed, error is already set
+        }
+
+        // Now that sessions are ready, start execution
+        setIsExecuting(true);
+
         // Get all required session handles
-        const requiredChains = Array.from(new Set(dumpTokens.map(token => token.chainId)));
+        const requiredChains = Array.from(
+          new Set(dumpTokens.map((token) => token.chainId))
+        );
         const sessionHandles: Record<number, any> = {};
-        
+
+        console.log('🔄 Loading session handles for chains:', requiredChains);
+
         for (const chainId of requiredChains) {
-          const session = getSession(chainId);
+          console.log(`🔄 Getting session handle for chain ${chainId}...`);
+          const session = await getSession(chainId);
           if (!session) {
-            throw new Error(`No session available for chain ${chainId}`);
+            throw new Error(
+              `Unable to load or create session for chain ${chainId}. Please try enabling sessions again.`
+            );
           }
           sessionHandles[chainId] = session;
+          console.log(`✅ Session handle loaded for chain ${chainId}`);
         }
-        
+
         // Execute the purge
         await executePurge(sessionHandles);
         setExecutionComplete(true);
+        console.log('✅ Order execution completed successfully');
       } catch (error) {
-        console.error('Order execution failed:', error);
-        setExecutionError(error instanceof Error ? error.message : 'Execution failed');
+        console.error('❌ Order execution failed:', error);
+        setExecutionError(
+          error instanceof Error ? error.message : 'Execution failed'
+        );
       } finally {
         setIsExecuting(false);
+        // Reset execution guard on completion/error
+        executionStartedRef.current = false;
       }
     };
 
     executeOrders();
-  }, [dumpTokens, executePurge, getSession, isExecuting, executionComplete]);
+  }, [dumpTokens.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Only depend on dumpTokens.length to prevent infinite loops - other deps would cause re-execution
 
   // Calculate execution stats
-  const executedOrders = orders.filter(order => order.status === 'executed');
-  const failedOrders = orders.filter(order => order.status === 'failed');
-  const actualValue = executedOrders.reduce((sum, order) => 
-    sum + parseFloat(order.estimatedUSDC), 0
+  const executedOrders = orders.filter((order) => order.status === 'executed');
+  const failedOrders = orders.filter((order) => order.status === 'failed');
+  const actualValue = executedOrders.reduce(
+    (sum, order) => sum + parseFloat(order.estimatedUSDC),
+    0
   );
 
   const createShareImage = async () => {
@@ -227,6 +332,7 @@ export default function SuccessPage() {
   const resetApp = () => {
     // Reset state and go back to start
     // You could also call a reset function from the store
+    resetAppState();
     router.push('/enter');
   };
 
@@ -240,7 +346,67 @@ export default function SuccessPage() {
       {/* Content */}
       <div className='flex-1 flex flex-col items-center justify-center px-6'>
         <AnimatePresence mode='wait'>
-          {isExecuting && (
+          {isInitializingSessions && (
+            <motion.div
+              key='initializing'
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.6, type: 'spring' }}
+              className='text-center'
+            >
+              {/* Loading Icon */}
+              <div className='w-32 h-32 bg-white rounded-full mx-auto mb-8 flex items-center justify-center'>
+                <Loader2 className='w-16 h-16 text-primary animate-spin' />
+              </div>
+
+              {/* Session Initialization Message */}
+              <div className='bg-white rounded-2xl p-8 mb-8 max-w-sm mx-auto'>
+                <h1 className='text-2xl font-bold text-gray-900 mb-4'>
+                  Creating Smart Accounts...
+                </h1>
+                <p className='text-gray-700 mb-4'>
+                  Setting up gasless trading for your tokens
+                </p>
+                {sessionInitProgress && (
+                  <p className='text-primary font-medium mb-2'>
+                    {sessionInitProgress}
+                  </p>
+                )}
+                <p className='text-sm text-gray-600'>
+                  This is free and sponsored by Fumble
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          {sessionInitError && !isInitializingSessions && (
+            <motion.div
+              key='session-error'
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, type: 'spring' }}
+              className='text-center'
+            >
+              {/* Error Icon */}
+              <div className='w-32 h-32 bg-white rounded-full mx-auto mb-8 flex items-center justify-center'>
+                <XCircle className='w-16 h-16 text-red-500' />
+              </div>
+
+              {/* Error Message */}
+              <div className='bg-white rounded-2xl p-8 mb-8 max-w-sm mx-auto'>
+                <h1 className='text-2xl font-bold text-gray-900 mb-4'>
+                  Smart Account Setup Failed
+                </h1>
+                <p className='text-red-600 mb-4'>{sessionInitError}</p>
+                <p className='text-gray-700'>
+                  You can still try again or contact support.
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          {isExecuting && !isInitializingSessions && !sessionInitError && (
             <motion.div
               key='executing'
               initial={{ opacity: 0, scale: 0.8 }}
@@ -262,17 +428,22 @@ export default function SuccessPage() {
                 <p className='text-gray-700 mb-4'>
                   Submitting {tokenCount} orders across chains
                 </p>
-                
+
                 {/* Progress */}
                 <div className='space-y-2'>
                   <div className='text-sm text-gray-600'>
-                    {executedOrders.length + failedOrders.length} / {tokenCount} processed
+                    {executedOrders.length + failedOrders.length} / {tokenCount}{' '}
+                    processed
                   </div>
                   <div className='w-full bg-gray-200 rounded-full h-2'>
-                    <div 
+                    <div
                       className='bg-primary h-2 rounded-full transition-all duration-300'
-                      style={{ 
-                        width: `${((executedOrders.length + failedOrders.length) / tokenCount) * 100}%` 
+                      style={{
+                        width: `${
+                          ((executedOrders.length + failedOrders.length) /
+                            tokenCount) *
+                          100
+                        }%`,
                       }}
                     />
                   </div>
@@ -281,79 +452,106 @@ export default function SuccessPage() {
             </motion.div>
           )}
 
-          {(executionComplete || executionError) && (
-            <motion.div
-              key='complete'
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, type: 'spring' }}
-              className='text-center'
-            >
-              {/* Success/Error Icon */}
-              <div className='w-32 h-32 bg-white rounded-full mx-auto mb-8 flex items-center justify-center'>
+          {(executionComplete || executionError) &&
+            !isInitializingSessions &&
+            !sessionInitError && (
+              <motion.div
+                key='complete'
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.6, type: 'spring' }}
+                className='text-center'
+              >
+                {/* Success/Error Icon */}
+                <div className='w-32 h-32 bg-white rounded-full mx-auto mb-8 flex items-center justify-center'>
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
+                  >
+                    {/* {executionError ? ( */}
+                    {false ? (
+                      <XCircle className='w-16 h-16 text-red-500' />
+                    ) : (
+                      <CheckCircle className='w-16 h-16 text-green-500' />
+                    )}
+                  </motion.div>
+                </div>
+
+                {/* Results Message */}
                 <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className='bg-white rounded-2xl p-8 mb-8 max-w-sm mx-auto'
                 >
                   {executionError ? (
-                    <XCircle className='w-16 h-16 text-red-500' />
+                    <>
+                      <h1 className='text-2xl font-bold text-gray-900 mb-4'>
+                        Purge Failed
+                      </h1>
+                      <p className='text-red-600 mb-4'>{executionError}</p>
+                      <p className='text-gray-700'>
+                        Some orders may have been processed. Check your wallet.
+                      </p>
+                    </>
                   ) : (
-                    <CheckCircle className='w-16 h-16 text-green-500' />
+                    <>
+                      <h1 className='text-2xl font-bold text-gray-900 mb-4'>
+                        You Just Fumbled!
+                      </h1>
+                      <div className='space-y-2 mb-6'>
+                        <p className='text-lg font-semibold text-gray-900'>
+                          {/* {executedOrders.length} Tokens Purged */}
+                          {dumpTokens.length} Tokens Purged
+                        </p>
+                        <p className='text-3xl font-bold text-success'>
+                          ${actualValue.toFixed(2)} rescued
+                        </p>
+                        {failedOrders.length > 0 && (
+                          <p className='text-sm text-orange-600'>
+                            {failedOrders.length} orders failed
+                          </p>
+                        )}
+                      </div>
+                      <p className='text-gray-700'>
+                        You can now open your wallet in public again.
+                      </p>
+                    </>
                   )}
                 </motion.div>
-              </div>
-
-              {/* Results Message */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className='bg-white rounded-2xl p-8 mb-8 max-w-sm mx-auto'
-              >
-                {executionError ? (
-                  <>
-                    <h1 className='text-2xl font-bold text-gray-900 mb-4'>
-                      Purge Failed
-                    </h1>
-                    <p className='text-red-600 mb-4'>{executionError}</p>
-                    <p className='text-gray-700'>
-                      Some orders may have been processed. Check your wallet.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h1 className='text-2xl font-bold text-gray-900 mb-4'>
-                      You Just Fumbled!
-                    </h1>
-                    <div className='space-y-2 mb-6'>
-                      <p className='text-lg font-semibold text-gray-900'>
-                        {executedOrders.length} Tokens Purged
-                      </p>
-                      <p className='text-3xl font-bold text-success'>
-                        ${actualValue.toFixed(2)} rescued
-                      </p>
-                      {failedOrders.length > 0 && (
-                        <p className='text-sm text-orange-600'>
-                          {failedOrders.length} orders failed
-                        </p>
-                      )}
-                    </div>
-                    <p className='text-gray-700'>
-                      You can now open your wallet in public again.
-                    </p>
-                  </>
-                )}
               </motion.div>
-            </motion.div>
-          )}
+            )}
         </AnimatePresence>
       </div>
 
-      {/* Action Buttons - Only show when execution is complete */}
-      {(executionComplete || executionError) && (
+      {/* Action Buttons - Show based on current state */}
+      {sessionInitError && (
         <div className='p-6 space-y-3'>
-          {!executionError && (
+          <Button
+            onClick={() => {
+              setSessionInitError(null);
+              initializeMissingSessions();
+            }}
+            className='w-full bg-[linear-gradient(to_bottom,_#47474D_0%,_#47474D_35%,_#1B1B1D_100%)] disabled:opacity-30 text-white h-14 rounded-2xl text-lg font-medium mb-4'
+          >
+            RETRY SETUP
+          </Button>
+
+          <Button
+            onClick={resetApp}
+            variant='outline'
+            className='w-full border-0 bg-transparent hover:bg-transparent active:bg-transparent focus:bg-transparent text-gray-900 hover:text-gray-700 h-14 rounded-full text-lg font-medium transition-colors'
+          >
+            GO BACK
+          </Button>
+        </div>
+      )}
+
+      {(executionComplete || executionError) && !sessionInitError && (
+        <div className='p-6 space-y-3'>
+          {/* {!executionError && ( */}
+          {true && (
             <Button
               onClick={handleShare}
               className='w-full bg-[linear-gradient(to_bottom,_#47474D_0%,_#47474D_35%,_#1B1B1D_100%)] disabled:opacity-30 text-white h-14 rounded-2xl text-lg font-medium mb-4'

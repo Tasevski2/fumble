@@ -1,11 +1,11 @@
-import { createConfig, http } from 'wagmi';
+import { createConfig, http, injected } from 'wagmi';
 import { arbitrum, base } from 'wagmi/chains';
-import { metaMask, injected } from 'wagmi/connectors';
+import { metaMask } from 'wagmi/connectors';
 
 // Supported chains for Fumble
 export const supportedChains = [arbitrum, base] as const;
 
-// Wagmi configuration
+// Wagmi configuration - MetaMask only
 export const wagmiConfig = createConfig({
   chains: supportedChains,
   connectors: [
@@ -24,9 +24,10 @@ export const wagmiConfig = createConfig({
       useDeeplink: true,
       preferDesktop: false, // Important for mobile PWA
       checkInstallationImmediately: false,
-      extensionOnly: false,
+      extensionOnly: true, // Only target actual MetaMask extension
     }),
-    injected(), // Fallback for other wallets
+    injected(),
+    // No fallback connectors - MetaMask only
   ],
   transports: {
     [arbitrum.id]: http(),

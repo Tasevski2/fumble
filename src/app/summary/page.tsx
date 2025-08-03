@@ -22,16 +22,23 @@ import Image from 'next/image';
 
 export default function SummaryPage() {
   const router = useRouter();
-  const { dumpTokens, addresses, sessions, orders, resetAppState } =
-    useAppStore();
+  const { dumpTokens, addresses, orders, resetAppState } = useAppStore();
+
+  // Get sessions directly from store to ensure we have latest state
+  const sessions = useAppStore((state) => state.sessions);
+
   const {
     connect,
     initializeSession,
     hasSession,
     isConnecting,
+    isConnected,
+    address,
+    chainId,
     error,
     getSession,
   } = useWallet();
+
   const { executePurge } = useOrderExecutor();
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [showSessionModal, setShowSessionModal] = useState(false);
@@ -40,6 +47,27 @@ export default function SummaryPage() {
   >({});
   const [footerHeight, setFooterHeight] = useState(0);
   const footerRef = useRef<HTMLDivElement>(null);
+
+  // Debug Wagmi state
+  useEffect(() => {
+    console.log('🔍 Wagmi State Debug:', {
+      isConnected,
+      address,
+      chainId,
+      isConnecting,
+      error,
+      addressesCount: addresses.length,
+    });
+  }, [isConnected, address, chainId, isConnecting, error, addresses.length]);
+
+  // Debug modal state
+  useEffect(() => {
+    console.log('🔍 Modal State Debug:', {
+      showWalletModal,
+      showSessionModal,
+      footerHeight,
+    });
+  }, [showWalletModal, showSessionModal, footerHeight]);
 
   const totalValue = dumpTokens.reduce(
     (sum, token) => sum + token.balanceUsd,
@@ -58,19 +86,43 @@ export default function SummaryPage() {
   );
 
   const handleConnect = async (addressId: string) => {
+    console.log(
+      '🔗 CONNECTING - handleConnect called with addressId:',
+      addressId
+    );
+    console.log('🔗 isConnecting state:', isConnecting);
+    console.log('🔗 addresses:', addresses);
+    console.log('🔗 connect function available:', typeof connect);
+
     try {
       await connect(addressId);
+      console.log('🔗 Connection attempt completed');
     } catch (err) {
-      console.error('Connection failed:', err);
+      console.error('🔗 Connection failed:', err);
     }
   };
 
   const handleEnableSession = async (chainId: number) => {
     setInitializingSessions((prev) => ({ ...prev, [chainId]: true }));
     try {
+      console.log(`🔗 Starting session initialization for chain ${chainId}...`);
       await initializeSession(chainId);
+      console.log(`✅ Session successfully initialized for chain ${chainId}`);
+
+      // Force re-render to update session state
+      const latestSessions = useAppStore.getState().sessions;
+      console.log('📦 Latest sessions after initialization:', latestSessions);
     } catch (err) {
-      console.error('Session initialization failed:', err);
+      console.error(
+        `❌ Session initialization failed for chain ${chainId}:`,
+        err
+      );
+      // Show user-friendly error message
+      const errorMessage =
+        err instanceof Error ? err.message : 'Session initialization failed';
+      alert(
+        `Failed to create smart account for chain ${chainId}: ${errorMessage}\n\nPlease try again or contact support.`
+      );
     } finally {
       setInitializingSessions((prev) => ({ ...prev, [chainId]: false }));
     }
@@ -91,11 +143,34 @@ export default function SummaryPage() {
     );
 
     if (missingChains.length > 0) {
+      console.log('🔗 Missing sessions for chains:', missingChains);
+      setShowSessionModal(true);
+      return;
+    }
+
+    // Double-check sessions are actually stored before navigation
+    const storedSessions = useAppStore.getState().sessions;
+    console.log(
+      '✅ Checking stored sessions before navigation:',
+      storedSessions
+    );
+
+    const actuallyMissingChains = chainsToEnable.filter((chainId) => {
+      const session = storedSessions[chainId];
+      return !session || !session.isEnabled;
+    });
+
+    if (actuallyMissingChains.length > 0) {
+      console.error(
+        '❌ Sessions not properly stored for chains:',
+        actuallyMissingChains
+      );
       setShowSessionModal(true);
       return;
     }
 
     // All requirements met - proceed to execution
+    console.log('✅ All sessions verified, navigating to success page');
     router.push('/success');
   };
 
@@ -111,7 +186,7 @@ export default function SummaryPage() {
       const sessionHandles: Record<number, any> = {};
 
       for (const cId of requiredChains) {
-        const session = getSession(cId);
+        const session = await getSession(cId);
         if (!session) {
           throw new Error(`No session available for chain ${cId}`);
         }
@@ -145,7 +220,7 @@ export default function SummaryPage() {
       {/* Header */}
       <div className='flex items-center justify-between p-4 pb-8 flex-shrink-0'>
         <button
-          onClick={() => router.back()}
+          onClick={handleStartOver}
           className='p-2 -ml-2 rounded-full hover:bg-black/10 transition-colors'
         >
           <RotateCcw className='w-6 h-6' />
@@ -342,7 +417,7 @@ export default function SummaryPage() {
           <>
             {/* Backdrop */}
             <motion.div
-              className='fixed inset-0 bg-gray-500/20 z-40'
+              className='fixed inset-0 bg-gray-500/20 z-55'
               onClick={closeModal}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -352,7 +427,7 @@ export default function SummaryPage() {
 
             {/* Modal - slides from behind footer */}
             <motion.div
-              className='fixed left-0 right-0 bg-primary z-50 rounded-t-3xl overflow-hidden'
+              className='fixed left-0 right-0 bg-primary z-60 rounded-t-3xl overflow-hidden pointer-events-auto'
               style={{ bottom: 0 }}
               initial={{ y: '100%' }}
               animate={{ y: `-${footerHeight}px` }}
@@ -362,7 +437,7 @@ export default function SummaryPage() {
               }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             >
-              <div className='p-6'>
+              <div className='p-6 pointer-events-auto'>
                 <h1 className='text-2xl text-center font-bold text-primary-foreground mb-6'>
                   Connect wallets to <br /> purge them.
                 </h1>
@@ -391,15 +466,27 @@ export default function SummaryPage() {
                         </div>
                       </div>
                       <Button
-                        onClick={() => handleConnect(addr.id)}
+                        onClick={(e) => {
+                          console.log('🎯 Button clicked!', {
+                            addressId: addr.id,
+                            disabled: isConnecting,
+                            event: e,
+                          });
+                          e.stopPropagation();
+                          handleConnect(addr.id);
+                        }}
+                        onMouseDown={() => {
+                          console.log('🎯 Button mouse down:', addr.id);
+                        }}
                         disabled={isConnecting}
                         variant={addr.isConnected ? 'secondary' : 'default'}
                         size='sm'
                         className={
                           addr.isConnected
-                            ? 'bg-success text-white hover:bg-success/90'
-                            : 'bg-white text-primary-foreground hover:bg-white/90'
+                            ? 'bg-success text-white hover:bg-success/90 pointer-events-auto'
+                            : 'bg-white text-primary-foreground hover:bg-white/90 pointer-events-auto'
                         }
+                        style={{ pointerEvents: 'auto' }}
                       >
                         {isConnecting
                           ? 'Connecting...'
@@ -422,7 +509,7 @@ export default function SummaryPage() {
           <>
             {/* Backdrop */}
             <motion.div
-              className='fixed inset-0 bg-gray-500/20 z-40'
+              className='fixed inset-0 bg-gray-500/20 z-65'
               onClick={closeModal}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -432,7 +519,7 @@ export default function SummaryPage() {
 
             {/* Modal */}
             <motion.div
-              className='fixed left-0 right-0 bg-primary z-30 rounded-t-3xl overflow-hidden'
+              className='fixed left-0 right-0 bg-primary z-70 rounded-t-3xl overflow-hidden'
               style={{ bottom: 0 }}
               initial={{ y: '100%' }}
               animate={{ y: `-${footerHeight}px` }}
@@ -512,13 +599,39 @@ export default function SummaryPage() {
 
                 <div className='mt-6'>
                   <Button
-                    onClick={() => router.push('/success')}
+                    onClick={() => {
+                      // Double-check all sessions are enabled before navigating
+                      const missingChains = chainsToEnable.filter(
+                        (chainId) => !hasSession(chainId)
+                      );
+
+                      if (missingChains.length > 0) {
+                        console.error(
+                          '❌ Cannot proceed, missing sessions for chains:',
+                          missingChains
+                        );
+                        alert(
+                          `Please enable sessions for all chains before proceeding.\n\nMissing chains: ${missingChains.join(
+                            ', '
+                          )}`
+                        );
+                        return;
+                      }
+
+                      console.log(
+                        '✅ All sessions enabled, proceeding to success page'
+                      );
+                      router.push('/success');
+                    }}
                     disabled={chainsToEnable.some(
-                      (chainId) => !hasSession(chainId)
+                      (chainId) =>
+                        !hasSession(chainId) || initializingSessions[chainId]
                     )}
                     className='w-full bg-white text-primary-foreground hover:bg-white/90 h-12 rounded-xl font-medium'
                   >
-                    Continue to Purge
+                    {Object.values(initializingSessions).some((v) => v)
+                      ? 'Enabling Sessions...'
+                      : 'Continue to Purge'}
                   </Button>
                 </div>
               </div>
