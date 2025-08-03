@@ -1,22 +1,22 @@
-import { Token } from '@/types'
+import { Token } from '@/types';
 
 const mockQuips = [
-  "Bought for the ticker. Stayed for the trauma.",
-  "This is what healing looks like",
-  "Cope continues",
-  "More bags than Louis Vuitton",
-  "Diamond hands? More like paper brain",
-  "HODL until death",
-  "The market has spoken",
-  "Rugpull survivor",
-  "Degen life chose me",
-  "Exit liquidity champion",
-  "Portfolio therapy session",
-  "Bagholder anonymous",
-  "Crypto winter casualty",
-  "Yield farming your dreams",
-  "Smart money exit",
-]
+  'Bought for the ticker. Stayed for the trauma.',
+  'This is what healing looks like',
+  'Cope continues',
+  'More bags than Louis Vuitton',
+  'Diamond hands? More like paper brain',
+  'HODL until death',
+  'The market has spoken',
+  'Rugpull survivor',
+  'Degen life chose me',
+  'Exit liquidity champion',
+  'Portfolio therapy session',
+  'Bagholder anonymous',
+  'Crypto winter casualty',
+  'Yield farming your dreams',
+  'Smart money exit',
+];
 
 const mockTokens = [
   {
@@ -99,7 +99,7 @@ const mockTokens = [
     price: 0.0718,
     change24h: 3.4,
   },
-]
+];
 
 export function generateMockTokens(threshold: number = 5): Token[] {
   return mockTokens.map((token, index) => ({
@@ -112,30 +112,37 @@ export function generateMockTokens(threshold: number = 5): Token[] {
     price: token.price,
     change24h: token.change24h,
     chainId: 42161, // Arbitrum
-    logoUrl: `https://tokens.1inch.io/0x${Math.random().toString(16).substr(2, 40)}.png`,
+    logoUrl: `https://tokens.1inch.io/0x${Math.random()
+      .toString(16)
+      .substr(2, 40)}.png`,
     isSpam: token.balanceUsd < threshold,
-  }))
+  }));
 }
 
 export function getRandomQuip(): string {
-  return mockQuips[Math.floor(Math.random() * mockQuips.length)]
+  return mockQuips[Math.floor(Math.random() * mockQuips.length)];
 }
 
-export function formatBalance(balance: string, decimals: number = 18): string {
-  const num = parseFloat(balance)
-  if (num >= 1e9) return `${(num / 1e9).toFixed(1)}B`
-  if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`
-  if (num >= 1e3) return `${(num / 1e3).toFixed(1)}K`
-  return num.toFixed(2)
+export function formatBalance(
+  balance: string | number,
+  decimals: number = 18
+): string {
+  const num = typeof balance === 'number' ? balance : parseFloat(balance);
+  if (num >= 1e9) return `${(num / 1e9).toFixed(1)}B`;
+  if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`;
+  if (num >= 1e3) return `${(num / 1e3).toFixed(1)}K`;
+  return num.toFixed(2);
 }
 
-export function formatPrice(price: number): string {
-  if (price < 0.001) return `$${price.toExponential(2)}`
-  if (price < 1) return `$${price.toFixed(6)}`
-  return `$${price.toFixed(2)}`
+export function formatPrice(price: number | string): string {
+  const formattedPrice: number =
+    typeof price === 'number' ? price : parseFloat(price);
+  if (formattedPrice < 0.001) return `$${formattedPrice.toExponential(2)}`;
+  if (formattedPrice < 1) return `$${formattedPrice.toFixed(6)}`;
+  return `$${formattedPrice.toFixed(2)}`;
 }
 
 export function formatChange(change: number): string {
-  const sign = change >= 0 ? '+' : ''
-  return `${sign}${change.toFixed(2)}%`
+  const sign = change >= 0 ? '+' : '';
+  return `${sign}${change.toFixed(2)}%`;
 }

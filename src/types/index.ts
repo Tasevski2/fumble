@@ -40,7 +40,10 @@ export interface ChainConfig {
 export interface SessionData {
   chainId: number
   accountAddress: `0x${string}`
+  sessionKeyAddress?: `0x${string}`
   isEnabled: boolean
+  isDeployed: boolean
+  deploymentHash?: `0x${string}`
   expiresAt: number
 }
 

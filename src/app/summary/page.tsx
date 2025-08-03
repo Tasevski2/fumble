@@ -19,13 +19,11 @@ import { getTokenOrderStatus, isOrderFinal } from '@/utils/orderStatus';
 import { OrderStatusBadge } from '@/components/OrderStatusBadge';
 import { useOrderExecutor } from '@/lib/executor';
 import Image from 'next/image';
+import { cn } from '@/lib/utils';
 
 export default function SummaryPage() {
   const router = useRouter();
   const { dumpTokens, addresses, orders, resetAppState } = useAppStore();
-
-  // Get sessions directly from store to ensure we have latest state
-  const sessions = useAppStore((state) => state.sessions);
 
   const {
     connect,
@@ -397,7 +395,7 @@ export default function SummaryPage() {
       {/* Footer - Fixed at bottom */}
       <div
         ref={footerRef}
-        className='flex-shrink-0 px-6 py-8 border-t border-gray-100 bg-primary-light relative z-50'
+        className='flex-shrink-0 px-6 py-8 border-t border-gray-100 bg-primary-light relative z-40'
       >
         <Button
           onClick={handlePurgeClick}
@@ -417,7 +415,7 @@ export default function SummaryPage() {
           <>
             {/* Backdrop */}
             <motion.div
-              className='fixed inset-0 bg-gray-500/20 z-55'
+              className='fixed inset-0 bg-gray-500/20 z-[70]'
               onClick={closeModal}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -427,17 +425,17 @@ export default function SummaryPage() {
 
             {/* Modal - slides from behind footer */}
             <motion.div
-              className='fixed left-0 right-0 bg-primary z-60 rounded-t-3xl overflow-hidden pointer-events-auto'
+              className='fixed left-0 right-0 bg-primary z-[80] rounded-t-3xl overflow-hidden'
               style={{ bottom: 0 }}
               initial={{ y: '100%' }}
-              animate={{ y: `-${footerHeight}px` }}
+              animate={{ y: `-${Math.max(footerHeight + 16, 100)}px` }}
               exit={{
                 y: '100%',
                 transition: { duration: 0.3, ease: 'easeIn' },
               }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             >
-              <div className='p-6 pointer-events-auto'>
+              <div className='p-6 relative'>
                 <h1 className='text-2xl text-center font-bold text-primary-foreground mb-6'>
                   Connect wallets to <br /> purge them.
                 </h1>
@@ -472,21 +470,34 @@ export default function SummaryPage() {
                             disabled: isConnecting,
                             event: e,
                           });
+                          e.preventDefault();
                           e.stopPropagation();
                           handleConnect(addr.id);
                         }}
-                        onMouseDown={() => {
-                          console.log('🎯 Button mouse down:', addr.id);
+                        onTouchStart={(e) => {
+                          console.log('🎯 Button touch start:', addr.id);
+                          e.stopPropagation();
+                        }}
+                        onTouchEnd={(e) => {
+                          console.log('🎯 Button touch end:', addr.id);
+                          e.preventDefault();
+                          e.stopPropagation();
                         }}
                         disabled={isConnecting}
                         variant={addr.isConnected ? 'secondary' : 'default'}
                         size='sm'
-                        className={
+                        className={cn(
+                          'relative z-10 cursor-pointer touch-manipulation select-none',
                           addr.isConnected
-                            ? 'bg-success text-white hover:bg-success/90 pointer-events-auto'
-                            : 'bg-white text-primary-foreground hover:bg-white/90 pointer-events-auto'
-                        }
-                        style={{ pointerEvents: 'auto' }}
+                            ? 'bg-success text-white hover:bg-success/90 active:bg-success/80'
+                            : 'bg-white text-primary-foreground hover:bg-white/90 active:bg-white/80'
+                        )}
+                        style={{ 
+                          touchAction: 'manipulation',
+                          WebkitTapHighlightColor: 'transparent',
+                          minHeight: '44px',
+                          minWidth: '44px'
+                        }}
                       >
                         {isConnecting
                           ? 'Connecting...'
@@ -509,7 +520,7 @@ export default function SummaryPage() {
           <>
             {/* Backdrop */}
             <motion.div
-              className='fixed inset-0 bg-gray-500/20 z-65'
+              className='fixed inset-0 bg-gray-500/20 z-[70]'
               onClick={closeModal}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -519,10 +530,10 @@ export default function SummaryPage() {
 
             {/* Modal */}
             <motion.div
-              className='fixed left-0 right-0 bg-primary z-70 rounded-t-3xl overflow-hidden'
+              className='fixed left-0 right-0 bg-primary z-[80] rounded-t-3xl overflow-hidden'
               style={{ bottom: 0 }}
               initial={{ y: '100%' }}
-              animate={{ y: `-${footerHeight}px` }}
+              animate={{ y: `-${Math.max(footerHeight + 16, 100)}px` }}
               exit={{
                 y: '100%',
                 transition: { duration: 0.3, ease: 'easeIn' },
@@ -571,14 +582,32 @@ export default function SummaryPage() {
                         </div>
 
                         <Button
-                          onClick={() => handleEnableSession(chainId)}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleEnableSession(chainId);
+                          }}
+                          onTouchStart={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onTouchEnd={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
                           disabled={isEnabled || isInitializing}
                           size='sm'
-                          className={
+                          className={cn(
+                            'relative z-10 cursor-pointer touch-manipulation select-none',
                             isEnabled
-                              ? 'bg-green-500 text-white hover:bg-green-600'
-                              : 'bg-white text-primary-foreground hover:bg-white/90'
-                          }
+                              ? 'bg-green-500 text-white hover:bg-green-600 active:bg-green-700'
+                              : 'bg-white text-primary-foreground hover:bg-white/90 active:bg-white/80'
+                          )}
+                          style={{ 
+                            touchAction: 'manipulation',
+                            WebkitTapHighlightColor: 'transparent',
+                            minHeight: '44px',
+                            minWidth: '44px'
+                          }}
                         >
                           {isInitializing
                             ? 'Enabling...'
@@ -599,7 +628,10 @@ export default function SummaryPage() {
 
                 <div className='mt-6'>
                   <Button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
                       // Double-check all sessions are enabled before navigating
                       const missingChains = chainsToEnable.filter(
                         (chainId) => !hasSession(chainId)
@@ -623,11 +655,26 @@ export default function SummaryPage() {
                       );
                       router.push('/success');
                     }}
+                    onTouchStart={(e) => {
+                      e.stopPropagation();
+                    }}
+                    onTouchEnd={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
                     disabled={chainsToEnable.some(
                       (chainId) =>
                         !hasSession(chainId) || initializingSessions[chainId]
                     )}
-                    className='w-full bg-white text-primary-foreground hover:bg-white/90 h-12 rounded-xl font-medium'
+                    className={cn(
+                      'w-full bg-white text-primary-foreground hover:bg-white/90 active:bg-white/80 h-12 rounded-xl font-medium touch-manipulation select-none',
+                      'relative z-10 cursor-pointer'
+                    )}
+                    style={{ 
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent',
+                      minHeight: '48px'
+                    }}
                   >
                     {Object.values(initializingSessions).some((v) => v)
                       ? 'Enabling Sessions...'

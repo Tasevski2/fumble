@@ -13,9 +13,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Get the appropriate bundler endpoint based on chain
-    const bundlerUrl = chainId === 42161
-      ? process.env.PIMLICO_BUNDLER_RPC_ARBITRUM
-      : process.env.PIMLICO_BUNDLER_RPC_BASE;
+    const bundlerUrl =
+      chainId === 42161
+        ? process.env.PIMLICO_BUNDLER_RPC_ARBITRUM
+        : process.env.PIMLICO_BUNDLER_RPC_BASE;
 
     if (!bundlerUrl) {
       return NextResponse.json(
@@ -29,7 +30,8 @@ export async function POST(req: NextRequest) {
       method: 'eth_sendUserOperation',
       params: [
         userOp,
-        process.env.ENTRY_POINT_ADDRESS || '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789', // EntryPoint v0.6
+        process.env.ENTRY_POINT_ADDRESS ||
+          '0x0000000071727De22E5E9d8BAf0edAc6f37da032', // EntryPoint v0.7
       ],
       id: 1,
       jsonrpc: '2.0',
@@ -48,7 +50,7 @@ export async function POST(req: NextRequest) {
     if (data.error) {
       console.error('Bundler submission error:', data.error);
       return NextResponse.json(
-        { 
+        {
           error: data.error.message || 'UserOp submission failed',
           code: data.error.code,
         },
@@ -69,7 +71,6 @@ export async function POST(req: NextRequest) {
       status: 'submitted',
       timestamp: Date.now(),
     });
-
   } catch (error) {
     console.error('Bundler API error:', error);
     return NextResponse.json(
@@ -101,9 +102,10 @@ export async function GET(req: NextRequest) {
     }
 
     // Get the appropriate bundler endpoint based on chain
-    const bundlerUrl = chainId === 42161
-      ? process.env.PIMLICO_BUNDLER_RPC_ARBITRUM
-      : process.env.PIMLICO_BUNDLER_RPC_BASE;
+    const bundlerUrl =
+      chainId === 42161
+        ? process.env.PIMLICO_BUNDLER_RPC_ARBITRUM
+        : process.env.PIMLICO_BUNDLER_RPC_BASE;
 
     if (!bundlerUrl) {
       return NextResponse.json(
@@ -146,7 +148,7 @@ export async function GET(req: NextRequest) {
     }
 
     const receipt = data.result;
-    
+
     return NextResponse.json({
       status: receipt.success ? 'success' : 'failed',
       userOpHash,
@@ -155,7 +157,6 @@ export async function GET(req: NextRequest) {
       blockNumber: receipt.receipt?.blockNumber,
       gasUsed: receipt.receipt?.gasUsed,
     });
-
   } catch (error) {
     console.error('UserOp status check error:', error);
     return NextResponse.json(

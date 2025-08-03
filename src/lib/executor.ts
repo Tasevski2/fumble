@@ -1,7 +1,7 @@
 import { useAppStore } from '@/state/useAppStore';
-import { getQuote, buildOrderTypedData, signAndSubmitOrder } from './oneinch';
+import { getQuote, buildSwapParams, submitGaslessSwap } from './oneinch';
 import { getChainConfig } from '@/config/chains';
-import { checkOrderbookLiquidity, validateBatchLiquidity } from './liquidity';
+import { validateBatchLiquidity } from './liquidity';
 import { logger } from './logger';
 import type { SessionHandle } from './mdt';
 import type { Token, OrderIntent } from '@/types';
@@ -107,39 +107,35 @@ export async function executePurgeOrders(
             amount: token.balance,
           });
 
-          // Build order typed data
-          const { order, typedData } = buildOrderTypedData({
+          // Build swap parameters for Intent Swap API
+          const swapParams = buildSwapParams({
             chainId: chainIdNum,
-            maker: sessionHandle.accountAddress,
-            makerAsset: token.address as `0x${string}`,
-            makerAmount: token.balance,
-            takerAmountMin: quote.toAmountMin,
+            fromTokenAddress: token.address as `0x${string}`,
+            amount: token.balance,
+            fromAddress: sessionHandle.accountAddress,
+            slippage: 1, // 1% slippage
           });
 
-          // Sign and submit order
+          // Submit gasless swap
           updateOrder(orderId, { status: 'submitted' });
+          console.log('submitGaslessSwap', sessionHandle, swapParams);
+          
+          const swapResult = await submitGaslessSwap(sessionHandle, swapParams);
 
-          const orderHash = await signAndSubmitOrder(
-            sessionHandle,
-            typedData,
-            order,
-            chainIdNum
-          );
-
-          // Order successfully submitted
+          // Swap successfully submitted
           updateOrder(orderId, {
             status: 'executed',
-            orderHash,
-            estimatedUSDC: (parseFloat(quote.toAmountMin) / 1e6).toFixed(2), // Convert USDC amount
+            orderHash: swapResult.transaction?.hash || 'gasless-swap-' + Date.now(),
+            estimatedUSDC: swapResult.toAmount ? (parseFloat(swapResult.toAmount) / 1e6).toFixed(2) : (parseFloat(quote.toAmountMin || '0') / 1e6).toFixed(2),
           });
 
           logger.orderStatusChanged(orderId, 'submitted', 'executed');
-          logger.info('Order execution successful', {
+          logger.info('Gasless swap execution successful', {
             orderId,
             tokenSymbol: token.symbol,
             chainId: chainIdNum,
-            orderHash,
-            estimatedUSDC: (parseFloat(quote.toAmountMin) / 1e6).toFixed(2),
+            transactionHash: swapResult.transaction?.hash,
+            estimatedUSDC: swapResult.toAmount ? (parseFloat(swapResult.toAmount) / 1e6).toFixed(2) : (parseFloat(quote.toAmountMin || '0') / 1e6).toFixed(2),
           });
 
           // Success - break retry loop
@@ -185,7 +181,7 @@ export async function executePurgeOrders(
 
 // Hook to execute purge orders
 export function useOrderExecutor() {
-  const { dumpTokens, sessions, addOrder, updateOrder } = useAppStore();
+  const { dumpTokens, addOrder, updateOrder } = useAppStore();
 
   const executePurge = async (
     sessionHandles: Record<number, SessionHandle>

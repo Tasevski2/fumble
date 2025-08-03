@@ -15,11 +15,17 @@ export const CHAINS = {
     symbol: "ETH",
     oneInch: {
       orderbookApiBase: "https://limit-orders.1inch.io/v4.0/8453/",
-      verifyingContract: undefined as unknown as `0x${string}`, // resolve via SDK or fill from official docs
+      verifyingContract: "0x7F069df72b7A39bCE9806e3AfaF579E54D8CF2b9" as const, // Using same contract for now - update when Base contract is known
     },
     blockExplorer: "https://basescan.org",
   },
 } as const;
+
+// EntryPoint v0.6 address for ERC-4337 (more widely supported)
+export const ENTRYPOINT_V06 = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789" as const;
+
+// EntryPoint v0.7 address (future use)
+export const ENTRYPOINT_V07 = "0x0000000071727De22E5E9d8BAf0edAc6f37da032" as const;
 
 export type ChainKey = keyof typeof CHAINS;
 export type ChainConfig = typeof CHAINS[ChainKey];
@@ -46,4 +52,10 @@ export function getUSDCAddress(chainId: number): `0x${string}` | undefined {
 // Helper to validate if a chain is supported
 export function isChainSupported(chainId: number): boolean {
   return ACTIVE_CHAIN_IDS.includes(chainId as 42161 | 8453);
+}
+
+// Helper to get 1inch verifying contract for delegation allowed targets
+export function getOneInchVerifyingContract(chainId: number): `0x${string}` | undefined {
+  const config = getChainConfig(chainId);
+  return config?.oneInch.verifyingContract;
 }

@@ -82,7 +82,7 @@ export function useWallet() {
   // Check if MetaMask is available
   const isMetaMaskAvailable = useCallback(() => {
     const metaMaskConnector = connectors.find(
-      (connector) => connector.id === 'metaMask' || connector.id === 'injected'
+      (connector) => connector.id === 'metaMask'
     );
     return !!metaMaskConnector;
   }, [connectors]);
@@ -135,8 +135,7 @@ export function useWallet() {
 
         // Get MetaMask connector
         const metaMaskConnector = connectors.find(
-          (connector) =>
-            connector.id === 'metaMask' || connector.id === 'injected'
+          (connector) => connector.id === 'metaMask'
         );
 
         console.log('🔗 Available connectors:', connectors);
@@ -316,8 +315,7 @@ export function useWallet() {
     if (isConnected && address && chainId) {
       // Validate that we're connected to MetaMask and not another wallet
       const connectedConnector = connectors.find(
-        (connector) =>
-          connector.id === 'metaMask' || connector.id === 'injected'
+        (connector) => connector.id === 'metaMask'
       );
 
       if (!connectedConnector) {

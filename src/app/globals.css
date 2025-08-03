@@ -72,4 +72,28 @@
   .safe-area-inset-right {
     padding-right: env(safe-area-inset-right);
   }
+
+  /* Mobile touch optimizations */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  /* Ensure buttons have adequate touch targets on mobile */
+  @media (max-width: 768px) {
+    button, .button, [role="button"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
+  /* Prevent zoom on form inputs on iOS */
+  @media screen and (max-width: 768px) {
+    input, textarea, select {
+      font-size: 16px !important;
+    }
+  }
 }
