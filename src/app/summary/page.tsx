@@ -46,27 +46,6 @@ export default function SummaryPage() {
   const [footerHeight, setFooterHeight] = useState(0);
   const footerRef = useRef<HTMLDivElement>(null);
 
-  // Debug Wagmi state
-  useEffect(() => {
-    console.log('🔍 Wagmi State Debug:', {
-      isConnected,
-      address,
-      chainId,
-      isConnecting,
-      error,
-      addressesCount: addresses.length,
-    });
-  }, [isConnected, address, chainId, isConnecting, error, addresses.length]);
-
-  // Debug modal state
-  useEffect(() => {
-    console.log('🔍 Modal State Debug:', {
-      showWalletModal,
-      showSessionModal,
-      footerHeight,
-    });
-  }, [showWalletModal, showSessionModal, footerHeight]);
-
   const totalValue = dumpTokens.reduce(
     (sum, token) => sum + token.balanceUsd,
     0
@@ -84,33 +63,19 @@ export default function SummaryPage() {
   );
 
   const handleConnect = async (addressId: string) => {
-    console.log(
-      '🔗 CONNECTING - handleConnect called with addressId:',
-      addressId
-    );
-    console.log('🔗 isConnecting state:', isConnecting);
-    console.log('🔗 addresses:', addresses);
-    console.log('🔗 connect function available:', typeof connect);
-
     try {
       await connect(addressId);
-      console.log('🔗 Connection attempt completed');
     } catch (err) {
       console.error('🔗 Connection failed:', err);
     }
   };
 
   const handleEnableSession = async (chainId: number) => {
-    console.log('CLICKED');
     setInitializingSessions((prev) => ({ ...prev, [chainId]: true }));
     try {
       console.log(`🔗 Starting session initialization for chain ${chainId}...`);
       await initializeSession(chainId);
       console.log(`✅ Session successfully initialized for chain ${chainId}`);
-
-      // Force re-render to update session state
-      const latestSessions = useAppStore.getState().sessions;
-      console.log('📦 Latest sessions after initialization:', latestSessions);
     } catch (err) {
       console.error(
         `❌ Session initialization failed for chain ${chainId}:`,
@@ -471,21 +436,14 @@ export default function SummaryPage() {
                       </div>
                       <Button
                         onClick={(e) => {
-                          console.log('🎯 Button clicked!', {
-                            addressId: addr.id,
-                            disabled: isConnecting,
-                            event: e,
-                          });
                           e.preventDefault();
                           e.stopPropagation();
                           handleConnect(addr.id);
                         }}
                         onTouchStart={(e) => {
-                          console.log('🎯 Button touch start:', addr.id);
                           e.stopPropagation();
                         }}
                         onTouchEnd={(e) => {
-                          console.log('🎯 Button touch end:', addr.id);
                           e.preventDefault();
                           e.stopPropagation();
                         }}
@@ -596,10 +554,6 @@ export default function SummaryPage() {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            console.log(
-                              '🎯 Enable button clicked for chain:',
-                              chainId
-                            );
                             handleEnableSession(chainId);
                           }}
                           disabled={isEnabled || isInitializing}
@@ -662,13 +616,6 @@ export default function SummaryPage() {
                         '✅ All sessions enabled, proceeding to success page'
                       );
                       router.push('/success');
-                    }}
-                    onTouchStart={(e) => {
-                      e.stopPropagation();
-                    }}
-                    onTouchEnd={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
                     }}
                     disabled={chainsToEnable.some(
                       (chainId) =>
